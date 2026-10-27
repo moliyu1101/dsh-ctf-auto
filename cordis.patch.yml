@@ -1,0 +1,21 @@
+# dsh-ctf-auto — CTF 自动解题编排器（Host 平面）
+#
+# 一行插入：Host 插件负责题板状态库、模型工具（ctf_solve_* / ctf_flag_record）、
+# 子代理派发编排与 Web 面板通道；浏览器面板经 `dsh.client` 由 package.json 声明。
+- insert:
+    - id: dsh-ctf-auto
+      name: '@dsh-external/dsh-ctf-auto'
+      config:
+        # 同时运行的解题子代理上限
+        concurrency: 2
+        # 单次尝试超时（毫秒），超时中断并收口为 timeout
+        timeoutMs: 1800000
+        # 单题最多尝试次数（含首次）
+        maxAttempts: 3
+        # 失败/卡住后是否自动换角度重试
+        autoRetry: true
+        # 解题子代理使用的 agent preset（DSH ctf-solver 模式）
+        solverPreset: ctf-auto
+        # 题板根目录；留空 = ~/.dsh/ctf-auto
+        rootDir: ''
+

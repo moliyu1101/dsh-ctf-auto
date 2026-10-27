@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "CTF Auto Solver",
+    "description": "CTF challenge board with automated solve orchestration: queued challenges are attacked by subagents from fresh angles, with the statement, files and target URL as the contract, and live attempt timelines, facts, event logs and flag evidence; start, stop or retry with a hint from the board."
+  }
+}
