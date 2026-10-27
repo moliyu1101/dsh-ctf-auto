@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseImportInput, normalizeImportPath, safeKnowledgeName, ALLOWED_EXT } from "../../lib/kbimport.js";
+import { parseImportInput, normalizeImportPath, safeKnowledgeName, ALLOWED_EXT, MAX_IMPORT_TOTAL_BYTES } from "../../lib/kbimport.js";
 import { classifyFactKind, groupFactsByKind, FACT_KINDS } from "../../lib/blackboard.js";
 
 test("kbimport: parseImportInput 支持数组/换行/逗号/注释/去重", () => {
@@ -19,6 +19,7 @@ test("kbimport: normalizeImportPath 解析相对路径与扩展名校验", () =>
 	assert.equal(bad.ok, false);
 	assert.match(bad.error, /不支持的类型/);
 	assert.ok(ALLOWED_EXT.includes(".md"));
+	assert.equal(MAX_IMPORT_TOTAL_BYTES, 20 * 1024 * 1024);
 });
 
 test("kbimport: safeKnowledgeName 去路径/控制字符 + 重名后缀", () => {
