@@ -1,0 +1,46 @@
+{
+  "name": "@dsh-external/dsh-ctf-auto",
+  "version": "0.1.0",
+  "description": "CTF 自动解题编排器：题面/附件 → 每题目独立工作区 → 子代理自主解题（多轮尝试、事实链、卡点登记）→ flag 本地验证与台账；设置页「CTF 自动解题」面板（题板/进度/启停/日志）。平台自动取题与自动提交本版未启用，仅预留 adapter 契约。",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh-plugin",
+    "dsh-bundle",
+    "ctf",
+    "auto-solver",
+    "agent-orchestration"
+  ],
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib/",
+    "locale/",
+    "docs/",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "DESIGN.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  }
+}
