@@ -629,3 +629,16 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
 - 靶机：`ctf_platform_env`（start/status/extend/delete）与端点 `platform.env`；环境状态写入 challenge.environment 与事件。
 - 实测：真实 Token 下 `platform.status` 连通（agent 知枭）、`platform.challenges` 拉取 50 题、`platform.detect` 显示 24 个工具；
   环境 start→get→delete 已验证并清理。`lib/dasctf.js` 的 REST 客户端保留给只读调试用。
+
+---
+
+## 28. 全自动流水线（拉题 → 解题 → 提交）
+
+- `pipeline.run`：平台列表 → 过滤未解/未导入 → `platformImport` → `startChallenges` 入队；`dryRun` 只返回候选；
+  `autoFetchEnabled` 时 watchdog 按 `autoFetchIntervalMs` 周期调用（每轮 `autoFetchLimit` 题）。
+- `autoSubmitEnabled`（默认开）：`recordFlag` 登记 verified 且题目来自平台时，异步调 `platformSubmit`；
+  结果写 `challenge.platformSubmit {status,flag,message,at}` 与事件，`method=platform` 不重复触发。
+- 配置：`autoFetchEnabled/autoFetchIntervalMs/autoFetchLimit/autoSolveImported/autoSubmitEnabled`；
+  面板设置页「自动化」卡，题板顶栏「全自动跑板」按钮。
+- 实测：真实 DASCTF 已导入 50 题时 `pipeline.run dryRun` 正确返回 0 个新候选（去重生效）；
+  `platform.status` 连通（agent 知枭）；配置默认 autoSubmit=true、autoSolveImported=true。
