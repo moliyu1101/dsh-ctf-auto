@@ -617,15 +617,15 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
 
 ---
 
-## 27. DASCTF 开放 API（REST 通道）接入
+## 27. DASCTF 开放 API（MCP 通道）接入
 
-- 适配器：`lib/dasctf.js::createDasctfClient` —— Bearer 鉴权（`CTF2_AGENT_TOKEN`），默认基址
-  `https://ctf2.dasctf.com/api/open/v1/user`；路径模板化（`{platform}` / `{id}`），可用 `profile.paths` 覆盖
-  `{me,list,detail,submit,instance}`。
-- 方法：`me/listChallenges/getChallenge/submit/download`；每个方法带候选路径回退（404 自动试下一个），401/403 直接报鉴权错误；
-  `discover()` 汇总实际可用路径（面板「自动探测平台」/ `ctf_platform_detect` 调用）。
-- 配置：`platform.json` 增加 `kind:"dasctf"`、`platformSlug`、`apiToken`（或环境变量）；面板选「DASCTF 开放 API」后
-  填 Token/平台标识，保存后可测试连接、拉取题板、提交 flag。
-- 统一平台构造：`platformClientFromCfg(cfg)` 按 kind 选择 ctfd / generic / dasctf，状态、导入、提交、hints 共用同一路径。
-- 实测（本地 mock 开放 API）：配置 dasctf → `platform.status` 连通（用户 dasctf-agent，命中 `/agent/me/dasctf`）→
-  `platform.challenges` 拉到 2 题 → `platform.detect` 返回 paths；随后复位为空配置。真实 DASCTF 需用户 Token 与平台标识。
+- 端点：默认 `https://ctf2.dasctf.com/api/ai/v1/mcp`，Bearer `CTF2_AGENT_TOKEN`；首包 `initialize` 取 `Mcp-Session-Id`，
+  随后 `notifications/initialized`、`tools/list`、`tools/call`；兼容 JSON 与 `text/event-stream` 响应，429 按 `retry_after_ms` 重试一次。
+- 适配器：`lib/mcp-dasctf.js` —— `me/listChallenges/getChallenge/submit/download` + `environment`；
+  练习题走 `ctf2_get_practice_challenge` / `ctf2_submit_flag`，比赛题走 `ctf2_get_competition_challenge` /
+  `ctf2_submit_competition_flag`（提交带 `confirmation:true`）；附件用 `ctf2_get_attachment_url` 换 5 分钟签名 URL。
+- 平台配置：`kind:"dasctf"`、`apiToken`（或环境变量）、`baseUrl`（可空，默认 origin）、`mcpUrl`（可空，默认 `/api/ai/v1/mcp`）；
+  面板 dasctf 模式显示 MCP 地址字段；「自动探测平台」用 whoami 验证并显示工具数。
+- 靶机：`ctf_platform_env`（start/status/extend/delete）与端点 `platform.env`；环境状态写入 challenge.environment 与事件。
+- 实测：真实 Token 下 `platform.status` 连通（agent 知枭）、`platform.challenges` 拉取 50 题、`platform.detect` 显示 24 个工具；
+  环境 start→get→delete 已验证并清理。`lib/dasctf.js` 的 REST 客户端保留给只读调试用。

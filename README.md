@@ -270,20 +270,21 @@ CTFd API Token 只在同源请求中发送；外部 CDN/S3 附件不会携带平
 
 通用适配器支持字符串 ID、Bearer Token 和自定义 headers；附件自动下载仍只对 CTFd 提供，通用平台请在题面中提供可手动处理的附件地址。
 
-### DASCTF 开放 API（REST）
+### DASCTF 开放 API（MCP / REST）
 
-自研框架可直接调用 REST：请求头 `Authorization: Bearer $CTF2_AGENT_TOKEN`，基础地址默认
-`https://ctf2.dasctf.com/api/open/v1/user`，示例 `GET /agent/me/{platform}`。
+自研框架通过 MCP（HTTP JSON-RPC）接入：端点默认 `https://ctf2.dasctf.com/api/ai/v1/mcp`，请求头
+`Authorization: Bearer $CTF2_AGENT_TOKEN`；连接后可用全部 24 个工具（练习/比赛题、附件、提交、靶机环境、
+whoami、笔记等）。
 
 面板选择适配器模式 `dasctf`，填写：
 
 - `apiToken`：`CTF2_AGENT_TOKEN`（留空时读取同名环境变量）
-- `platformSlug`：平台标识（对应示例里的「一个平台」）
-- `baseUrl`：可留空使用默认基址
-- `profile.paths`：可选，覆盖 `me/list/detail/submit` 路径模板（`{platform}`/`{id}` 占位）
+- `baseUrl`：可留空（默认 `https://ctf2.dasctf.com`）
+- `mcpUrl`：可留空（默认 `<baseUrl>/api/ai/v1/mcp`）
 
-点「自动探测平台」会用 Token 试探候选路径并回填可用 `paths`；`platform.status` 走 `me` 验证连通性，
-导入/提交与 CTFd 流程一致。路径不确定时优先用探测结果或手工覆盖 `paths`。
+点「自动探测平台」会用 whoami 验证连通并显示可用工具数；导入/提交/靶机环境与 CTFd 流程一致：
+`platform.status` 走 whoami，拉取题板走 `ctf2_agent_next_challenges`，详情/附件/提交按题目来源自动选择
+练习或比赛工具；靶机用 `ctf_platform_env`（start/status/extend/delete）管理。
 
 ---
 
