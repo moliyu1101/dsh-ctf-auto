@@ -268,6 +268,18 @@ test("writeText: 拒绝越界 / 绝对路径 / 空路径 / 目录 / 超限", (t)
 	assert.ok(!fs.existsSync(path.join(challengeDir, "toobig.txt")));
 });
 
+test("writeText: 拒绝通过符号链接写入题目录外", (t) => {
+	const { root, challengeDir } = makeChallenge(t);
+	const outside = path.join(root, "outside.txt");
+	fs.writeFileSync(outside, "ORIGINAL");
+	fs.symlinkSync(outside, path.join(challengeDir, "notes-link.txt"));
+
+	const res = writeText(challengeDir, "notes-link.txt", "OVERWRITTEN");
+	assert.equal(res.ok, false);
+	assert.match(res.error, /符号链接/);
+	assert.equal(fs.readFileSync(outside, "utf8"), "ORIGINAL");
+});
+
 test("writeText: 写入后 listTree 可见", (t) => {
 	const { challengeDir } = makeChallenge(t);
 	const res = writeText(challengeDir, "artifacts/output.log", "line1\nline2\n");
