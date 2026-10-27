@@ -14,7 +14,7 @@
 - **多轮编排**：并发队列、单次超时、整题预算、预算结算、自动换角度重试、重启恢复。
 - **独立工作区**：每题一个目录，包含 `statement.md`、`notes.md`、`files/`、`scripts/`、`artifacts/`。
 - **可观测过程**：attempts、facts、events、failedPaths、flag evidence 全部写入状态库并展示在面板。
-- **双平台适配**：CTFd 和通用 JSON 平台；支持平台自动探测、按题导入、提示解锁、flag 提交回显。
+- **三平台适配**：CTFd、通用 JSON 与 DASCTF 开放 API（Bearer Token）；支持平台自动探测、按题导入、提示解锁、flag 提交回显。
 - **安全边界**：子代理只能操作自己的题目；全局平台/配置/宿主工具仅主会话可用；工作台拒绝符号链接逃逸。
 - **知识层**：检索导出的 Writeup、题目 notes 和导入资料；跨工作区可用。
 - **记忆层**：解出题后自动沉淀打法卡，下次遇到相似题时注入入口、步骤、命令和坑。
@@ -270,6 +270,21 @@ CTFd API Token 只在同源请求中发送；外部 CDN/S3 附件不会携带平
 
 通用适配器支持字符串 ID、Bearer Token 和自定义 headers；附件自动下载仍只对 CTFd 提供，通用平台请在题面中提供可手动处理的附件地址。
 
+### DASCTF 开放 API（REST）
+
+自研框架可直接调用 REST：请求头 `Authorization: Bearer $CTF2_AGENT_TOKEN`，基础地址默认
+`https://ctf2.dasctf.com/api/open/v1/user`，示例 `GET /agent/me/{platform}`。
+
+面板选择适配器模式 `dasctf`，填写：
+
+- `apiToken`：`CTF2_AGENT_TOKEN`（留空时读取同名环境变量）
+- `platformSlug`：平台标识（对应示例里的「一个平台」）
+- `baseUrl`：可留空使用默认基址
+- `profile.paths`：可选，覆盖 `me/list/detail/submit` 路径模板（`{platform}`/`{id}` 占位）
+
+点「自动探测平台」会用 Token 试探候选路径并回填可用 `paths`；`platform.status` 走 `me` 验证连通性，
+导入/提交与 CTFd 流程一致。路径不确定时优先用探测结果或手工覆盖 `paths`。
+
 ---
 
 ## 开发与测试
@@ -281,13 +296,13 @@ npm test
 当前测试 runner 会递归执行 `test/` 下的全部 `.test.mjs`，覆盖：
 
 - 编排、store、prompt、预算和重启恢复
-- CTFd / 通用平台客户端、自动探测和错误处理
+- CTFd / 通用平台 / DASCTF 客户端、自动探测和错误处理
 - 工作区隔离、子代理权限、跨工作区拒绝
 - 符号链接写入保护、跨源 Token 防护
 - 知识库、记忆、报告、Writeup、打包、分诊、WSL、靶机探测
 - 打包文件资源和 preset 自带技能卡
 
-当前状态：**174 个测试，174 通过**（全部使用临时目录和 fake/mock 服务，不依赖真实赛事平台）。
+当前状态：**182 个测试，182 通过**（全部使用临时目录和 fake/mock 服务，不依赖真实赛事平台）。
 
 静态检查：
 

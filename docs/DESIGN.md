@@ -614,3 +614,18 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
   最近完成（耗时/费用）+ 平台状态；工具 `ctf_schedule`。面板新增第 8 个标签「调度」：KPI（并发/排队/30min 尝试/完成）、
   运行中卡片（进度条 + 角度/角色/技能 chip + 停止）、排队卡片（位置 + 取消）、节奏条形图、最近完成列表。
   实测：mock CTFd 探测 kind=ctfd(high)、证据链完整；调度端点返回 6 桶节奏 + 最近完成 2 题。
+
+---
+
+## 27. DASCTF 开放 API（REST 通道）接入
+
+- 适配器：`lib/dasctf.js::createDasctfClient` —— Bearer 鉴权（`CTF2_AGENT_TOKEN`），默认基址
+  `https://ctf2.dasctf.com/api/open/v1/user`；路径模板化（`{platform}` / `{id}`），可用 `profile.paths` 覆盖
+  `{me,list,detail,submit,instance}`。
+- 方法：`me/listChallenges/getChallenge/submit/download`；每个方法带候选路径回退（404 自动试下一个），401/403 直接报鉴权错误；
+  `discover()` 汇总实际可用路径（面板「自动探测平台」/ `ctf_platform_detect` 调用）。
+- 配置：`platform.json` 增加 `kind:"dasctf"`、`platformSlug`、`apiToken`（或环境变量）；面板选「DASCTF 开放 API」后
+  填 Token/平台标识，保存后可测试连接、拉取题板、提交 flag。
+- 统一平台构造：`platformClientFromCfg(cfg)` 按 kind 选择 ctfd / generic / dasctf，状态、导入、提交、hints 共用同一路径。
+- 实测（本地 mock 开放 API）：配置 dasctf → `platform.status` 连通（用户 dasctf-agent，命中 `/agent/me/dasctf`）→
+  `platform.challenges` 拉到 2 题 → `platform.detect` 返回 paths；随后复位为空配置。真实 DASCTF 需用户 Token 与平台标识。
