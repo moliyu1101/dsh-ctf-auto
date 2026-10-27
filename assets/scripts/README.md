@@ -1,6 +1,6 @@
 # 脚本库（工具层）
 
-本目录预置一批「题目无关」的小工具，子代理可直接调用（路径：插件根 `scripts/`）。
+本目录预置一批「题目无关」的小工具，子代理可直接调用（路径：插件根 `assets/scripts/`）。
 `triage.sh`/`flag_check.py` 默认只读；`unpack.sh` 只写入指定输出目录；`wsl_tool.sh` 只转发用户明确给出的命令。所有脚本都要求使用者确认目标和附件可信。
 
 | 脚本 | 用途 | 用法 |
@@ -9,7 +9,6 @@
 | `triage.sh` | 附件快速分诊（file/strings/十六进制头） | `bash triage.sh ./files` |
 | `unpack.sh` | 压缩包识别与安全解压（拒绝绝对路径/`..`，尽量不覆盖） | `bash unpack.sh ./files/a.zip ./out` |
 | `wsl_tool.sh` | 在 WSL 里跑 Linux 工具链（pwntools/gdb/binwalk） | `bash wsl_tool.sh Ubuntu "python3 -c 'print(1)'"` |
-| `run-tests.mjs` | 递归运行仓库内全部 `*.test.mjs` | `npm test` |
 
 约定：
 - 新脚本放本目录并在上表登记；脚本必须幂等、默认只读、输出到 stdout。

@@ -13,12 +13,14 @@
 | 文件 | 归属 | 说明 |
 |---|---|---|
 | `package.json` `cordis.patch.yml` `icon.svg` `locale/*.json` | Lead | 清单/加载/展示资源 |
+| `assets/cards` `assets/roles` `assets/scripts` | Lead | 题型技能、角色卡、运行时脚本 |
 | `lib/index.js` | Lead | Host 入口：Config、模型工具、Web 路由、子代理 spawn、事件钩子 |
 | `lib/store.js` | solver-core | 题目状态库（JSON 持久化，纯 node） |
 | `lib/prompt.js` | solver-core | 解题提示词构建 + flag 提取 + 结果分类（纯函数） |
 | `lib/orchestrator.js` | solver-core | 队列/并发/超时/重试状态机（端口注入，不碰 DSH API） |
 | `lib/client.js` | panel-ui | 设置页「CTF 自动解题」面板（浏览器模块） |
 | `test/core/*.mjs` | solver-core | node:test 离线单测 |
+| `test/run-tests.mjs` | Lead | 递归测试入口 |
 | `docs/*` | 设计与运维说明 |
 
 ESM，无构建步骤；运行时代码只允许 Node 内置模块。Host 可用 `@deepseek-ai/schemastery`、
@@ -442,7 +444,7 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
    start → 子代理解题 → `ctf_flag_record(verified:true)` → 状态 solved。
 4. 真实验证：至少一道真实 CTF 题完整走完（题目自证）。
 5. 面板：设置页出现「CTF 自动解题」，能新建/启动/停止/重试并实时看到状态（无浏览器控制时报告此局限）。
-6. 文档：README（安装/使用/配置）、DESIGN.md（接口契约）。
+6. 文档：README（安装/使用/配置）、docs/DESIGN.md（接口契约）。
 
 ---
 
@@ -482,7 +484,7 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
 
 ## 19. P1 增强（角色分层 / 私有知识 / 分诊 / 打包）
 
-- **角色卡（3 张）**：`roles/{solver,reviewer,recon}.md` 全文注入（`lib/roles.js` 读文件 + 内置回退）。
+- **角色卡（3 张）**：`assets/roles/{solver,reviewer,recon}.md` 全文注入（`lib/roles.js` 读文件 + 内置回退）。
   orchestrator 按尝试选择角色：第 1 次 = `recon`（只做侦察与分诊），第 2+ 次 = `solver`；`attempt.role` 记录。
   `prompt.js` 接受 `roleText/roleName`，在提示词顶部插入「角色卡（全文载入）」段。
 - **独立复核（reviewer）**：`ctf_review_flag` / `flag.review` —— 用 `buildReviewPrompt` 派 reviewer 子代理（只给原始材料、
@@ -514,9 +516,9 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
 
 ## 21. 常驻/题型/知识导入/记忆页（本轮）
 
-- **常驻层**：`roles/resident.md`（判定表 + 短纪律），`preset.js` 用 `loadRoleText("resident")` 读取并注入 persona；
+- **常驻层**：`assets/roles/resident.md`（判定表 + 短纪律），`preset.js` 用 `loadRoleText("resident")` 读取并注入 persona；
   读不到时用内置短兜底。常驻层只做判定/路由，工具细节在工具描述。
-- **题型层**：插件自带 `cards/ctf-{mobile,cloud,ad,supply}/SKILL.md`，`skillDirsOf` 恒加入 `<plugin>/cards`（与 refs 并列，
+- **题型层**：插件自带 `assets/cards/ctf-{mobile,cloud,ad,supply}/SKILL.md`，`skillDirsOf` 恒加入 `<plugin>/assets/cards`（与 refs 并列，
   doctor 技能目录 13）；`MODULE_SKILLS` 补齐 4 类；`attempt.skill` / `attempt.role` 写入 attempt-start 事件。
 - **知识层导入**：`lib/kbimport.js`（parse/normalize/safeName 纯函数）；宿主 `knowledgeDir()`=`<rootDir>/knowledge`，
   `kb.import` 复制文件（单文件≤2MB、单次≤50 个且总量≤20MB、去重后缀）、`kb.list`、`kb.delete`；`buildKnowledgeIndex` 新增 `imported` 源
@@ -525,7 +527,7 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
   `lib/blackboard.js` 做事实分层（标签优先 + 关键词兜底），`store.addFact` 落 `kind`；面板「记忆」页（工作区卡 + 分层筛选 + 事实流）。
 - **自动复核**：配置 `reviewerEnabled`（默认 false），watchdog 每 5s 挑「solved + 有已验证 flag + 无 review」的题（每次≤2）
   调 `reviewFlag`，带 in-flight 去重；设置页「质量门槛」卡新增开关。
-- **脚本库**：`scripts/README.md` + `flag_check.py`/`triage.sh`/`unpack.sh`/`wsl_tool.sh`（只读、幂等、输出到 stdout）。
+- **脚本库**：`assets/scripts/README.md` + `flag_check.py`/`triage.sh`/`unpack.sh`/`wsl_tool.sh`（只读、幂等、输出到 stdout）。
 - **未做**：125 篇知识卡内容、真实浏览器 UI 自动化、IDA/MCP（按要求暂缓）。
 
 ---
