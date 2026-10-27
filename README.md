@@ -77,7 +77,7 @@ ctf_solve_doctor()
 npm pack
 ```
 
-生成的 `.tgz` 已包含 `lib/`、`cards/`、`roles/`、`scripts/`、`test/` 和 `LICENSE`。随后使用 DSH 的 plugin manager 安装该 tarball，或使用对应 profile 的包管理命令安装。
+生成的 `.tgz` 已包含 `lib/`、`assets/`、`test/`、`docs/` 和 `LICENSE`。随后使用 DSH 的 plugin manager 安装该 tarball，或使用对应 profile 的包管理命令安装。
 
 > 插件不会自动安装外部 `ctf-solver` 技能目录。该目录缺失时，内置题型卡仍能工作，但部分模块技能会回退到通用 `ctf-playbook`。
 
@@ -294,13 +294,16 @@ npm test
 ```bash
 node --check lib/index.js
 node --check lib/client.js
-bash -n scripts/*.sh
-python3 -m py_compile scripts/flag_check.py
+bash -n assets/scripts/*.sh
+python3 -m py_compile assets/scripts/flag_check.py
 ```
 
 ### 目录结构
 
 ```text
+package.json / cordis.patch.yml   DSH bundle 清单与加载配置
+icon.svg / locale/                展示图标与语言资源
+README.md / LICENSE               使用说明与许可证
 lib/
   index.js          Host 入口、工具、Web 路由、平台和看门狗
   orchestrator.js   队列、并发、预算、重试和恢复
@@ -313,11 +316,12 @@ lib/
   report.js         复盘 Markdown
   writeup.js        Writeup 生成
   kb.js / memory.js 知识层和记忆层
-cards/              自带题型技能卡
-roles/              常驻、solver、recon、reviewer 角色卡
-scripts/            本地校验、分诊、解压、WSL 转发和测试 runner
-test/               单元/安全/打包测试
-docs/               解题操典和差距分析
+assets/
+  cards/            自带题型技能卡
+  roles/            常驻、solver、recon、reviewer 角色卡
+  scripts/          校验、分诊、解压和 WSL 转发脚本
+test/               单元/安全/打包测试 + run-tests.mjs
+docs/               设计契约、解题操典和差距分析
 ```
 
 ---
