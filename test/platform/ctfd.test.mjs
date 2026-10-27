@@ -554,6 +554,17 @@ test("download: maxBytes 上限拒绝", async (t) => {
 	assert.equal(okBig.size, 2048);
 });
 
+test("download: 无 Content-Length 时仍按流式上限拒绝", async () => {
+	const client = createCtfdClient({
+		baseUrl: "https://files.example.com",
+		token: "t",
+		fetchImpl: async () => new Response(new Uint8Array(101), { status: 200 })
+	});
+	const res = await client.download("https://files.example.com/big.bin", { maxBytes: 100 });
+	assert.equal(res.ok, false);
+	assert.equal(res.code, "too-large");
+});
+
 test("download: HTTP 错误返回 status", async (t) => {
 	const mock = await startMock();
 	t.after(() => mock.close());

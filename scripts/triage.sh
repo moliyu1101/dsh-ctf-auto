@@ -10,7 +10,7 @@ fi
 
 for target in "$@"; do
   if [ -d "$target" ]; then
-    find "$target" -maxdepth 2 -type f -printf '%p\n' 2>/dev/null | while read -r file; do
+    find "$target" -maxdepth 2 -type f -print 2>/dev/null | while IFS= read -r file; do
       printf '\n=== %s ===\n' "$file"
       printf 'size: %s bytes\n' "$(wc -c <"$file" 2>/dev/null || echo 0)"
       printf 'type: %s\n' "$(file -b "$file" 2>/dev/null || echo unknown)"

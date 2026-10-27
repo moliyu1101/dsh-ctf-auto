@@ -2,7 +2,7 @@
 
 > 本插件为独立实现：题板 / 编排 / 工作台 / 平台 / 知识 / 记忆 / 调度一体化。
 > 目标：DSH Desktop 宿主插件 —— 先把「CTF 解题」做成可自主运行、可观测、可重试的编排器；
-> 平台自动取题/自动提交**本版不做**，只在数据模型里留 `platform` 字段与 adapter 接口位。
+> 平台取题/导入/提交由 CTFd 与通用 JSON adapter 提供；平台调用只在主会话或显式面板操作中执行。
 >
 > 本文件是唯一接口契约。实现方严格按此签名/字段名写，不要自行改名；需要变更先告诉 Lead。
 
@@ -64,7 +64,7 @@ ESM，无构建步骤；运行时代码只允许 Node 内置模块。Host 可用
   facts: [{ at, text, source: "attempt#1", attempt: 1 }],   // 解题事实链（上限 120 条，超出丢最旧、同前缀去重）
   events: [{ at, kind: "queued|started|attempt-start|attempt-end|flag|stuck|stopped|error|note",
              text, attempt?: n, data?: {} }],                // 滚动保留最近 300 条
-  budget: { maxAttempts: 3, timeBudgetMs: 1800000 }
+  budget: { maxAttempts: 3, timeBudgetMs: 1800000 } // timeBudgetMs 为单题总预算
 }
 ```
 
@@ -129,7 +129,7 @@ export function nextAngle(n, config?)            // → ANGLES[Math.min(n, ANGLE
    一句话说明卡点（orchestrator 会记为 stuck）。
 6. 第 2+ 次尝试：附上前面每次尝试的 angle/summary/已失败路径（`priorAttempts`），
    指令「换全新角度，禁止重复以下路径」。
-7. 时间预算与产出要求：在 `timeBudgetMs` 内收尾；没有 flag 也要留下可续接的 notes。
+7. 时间预算与产出要求：在单题 `timeBudgetMs` 与本次有效 timeout 的较小值内收尾；没有 flag 也要留下可续接的 notes。
 
 `classifyAttempt`：`stopReason==="completed"` 且有 verified flag → solved；
 有未验证 flag → candidate；`error`/`aborted` → failed/aborted；否则 incomplete。
@@ -519,7 +519,7 @@ export function buildWriteup(challenge, { generatedAt, notes, files }) // → st
 - **题型层**：插件自带 `cards/ctf-{mobile,cloud,ad,supply}/SKILL.md`，`skillDirsOf` 恒加入 `<plugin>/cards`（与 refs 并列，
   doctor 技能目录 13）；`MODULE_SKILLS` 补齐 4 类；`attempt.skill` / `attempt.role` 写入 attempt-start 事件。
 - **知识层导入**：`lib/kbimport.js`（parse/normalize/safeName 纯函数）；宿主 `knowledgeDir()`=`<rootDir>/knowledge`，
-  `kb.import` 复制文件（单文件≤2MB、单次≤50、去重后缀）、`kb.list`、`kb.delete`；`buildKnowledgeIndex` 新增 `imported` 源
+  `kb.import` 复制文件（单文件≤2MB、单次≤50 个且总量≤20MB、去重后缀）、`kb.list`、`kb.delete`；`buildKnowledgeIndex` 新增 `imported` 源
   （sourceLabel=导入）；工具 `ctf_kb_import`；面板「知识」页（导入区 + 已导入列表 + 检索）。
 - **记忆层页面**：`memory.summary` 汇总所有工作区（byWorkspace）、黑板事实流（跨题/跨工作区，limit）、totals/timing；
   `lib/blackboard.js` 做事实分层（标签优先 + 关键词兜底），`store.addFact` 落 `kind`；面板「记忆」页（工作区卡 + 分层筛选 + 事实流）。

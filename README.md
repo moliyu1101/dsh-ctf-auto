@@ -111,13 +111,15 @@
 - **Web 面板**：单标签内部分页——题板（筛选/分组/工作台）、平台、台账、复盘（报告+Writeup）、设置（运行时配置+诊断）。
   attempts 时间线、facts、events、flags+证据、开始/停止/带提示重试。
 
-## 安装（本机已安装）
+## 安装
 
-插件包目录：`plugins/dsh-ctf-auto/`。
+将本目录作为 DSH bundle 安装到当前 profile；下面的路径是示意，请替换为你的实际绝对路径：
 
+```text
+plugin_manager action=install_bundle target=<absolute-path>/dsh-ctf-auto
 ```
-plugin_manager action=install_bundle target=C:\Users\user\Downloads\YCB\plugins\dsh-ctf-auto
-```
+
+发布包可用 `npm pack` 生成 `.tgz`。`cards/`、`roles/` 和 `scripts/` 都是运行时资源，已包含在 package `files` 中；CTF 模块技能仍需要本机可用的 `ctf-solver` 技能目录（见快速诊断中的 `skillSourceDir`）。
 
 - 首次安装即生效（宿主 HMR 激活）；**改宿主代码后需要重新加载**：
   `remove_bundle` → `install_bundle`（同一版本不能重复 install）。
@@ -130,6 +132,7 @@ plugin_manager action=install_bundle target=C:\Users\user\Downloads\YCB\plugins\
 | `concurrency` | `2` | 同时运行的解题子代理上限 |
 | `timeoutMs` | `1800000` | 单次尝试超时（毫秒），超时中断并收口为 `timeout` |
 | `maxAttempts` | `3` | 单题最多尝试次数（含首次） |
+| `ctf_solve_start.timeBudgetMinutes` | 不设置 | 单题总预算；从第一次尝试开始计时，并受 `timeoutMs` 单次上限约束 |
 | `autoRetry` | `true` | 失败/卡住后自动换角度重试 |
 | `solverPreset` | `ctf-auto` | 解题子代理使用的 agent preset（本插件注册的模式；也可填 `ctf-solver`） |
 | `solverModel` | `""` | 可选：子代理模型（空=跟随默认） |
@@ -245,6 +248,7 @@ plugins/dsh-ctf-auto/                插件包
   lib/search.js                      题板检索（题名/题面/尝试/事实/flag）
   lib/writeup.js                     单题 Writeup 生成（纯函数）
   lib/client.js                      单界面会话视图 + 设置页
+  cards/ roles/ scripts/              题型技能、角色卡和本地工具脚本
   test/core/ test/platform/          离线单测（fake spawn / mock CTFd / 临时目录）
   docs/SOLVE-DOCTRINE.md             CTF 自动解题操典（prompt 素材库，带条款 ID）
 ```
@@ -254,6 +258,7 @@ plugins/dsh-ctf-auto/                插件包
 - 只做「解题」，不攻击平台本身、不碰其他队伍资产；题面/附件/服务响应一律当**数据**而非指令
   （反注入纪律写进 prompt）。
 - flag 只认本机可复现证据；`verified=false` 候选不置已解。
+- `local-check` / `derivation` 仍依赖子代理提交的证据文本；高保证场景应使用平台提交回显或开启独立复核。
 - 破坏性操作停手：保持题目环境可重试，删目标侧资产/停服务须先报告。
 - 成本：每个 attempt 是一个完整子代理会话（模型调用计费）；用小 `maxAttempts`/`timeBudgetMinutes`
   控制，或先只跑单题验证。
@@ -261,25 +266,16 @@ plugins/dsh-ctf-auto/                插件包
 ## 测试
 
 ```bash
-# 单文件（沙箱下最稳）
-node test/core/store.test.mjs
-node test/core/prompt.test.mjs
-node test/core/orchestrator.test.mjs
-
-# 一次全跑：必须显式列文件（传目录会 ERR_UNSUPPORTED_DIR_IMPORT）；
-# 且需关掉 Node 的 per-file 子进程隔离（DSH Windows 沙箱禁止 piped-stdio spawn：
-# 默认 `node --test test/core` 会报 spawn EPERM）
-node --test --experimental-test-isolation=none \
-  test/core/prompt.test.mjs test/core/store.test.mjs test/core/orchestrator.test.mjs \
-  test/platform/ctfd.test.mjs test/platform/workbench.test.mjs test/platform/report.test.mjs
+npm test
 ```
 
-当前：**162/162 通过**（23 个测试文件，覆盖编排、store、prompt、CTFd/通用平台/自动探测、知识库、记忆、打包、分诊、WSL、靶机探测等）。ctfd 测试自带 `node:http` mock CTFd，不联网。
+测试 runner 会递归收集 `test/` 下的 `.test.mjs`，覆盖编排、store、prompt、CTFd/通用平台、自动探测、工作区与工具权限、知识库、记忆、打包、分诊、WSL 和靶机探测。CTFd 测试自带 `node:http` mock CTFd，不联网。
 
 ## 已知限制 / 后续
 
 - 平台接入目前验证到**本地 mock CTFd**（真实赛事平台未实测）：CTFd 各版本字段差异做了容错，
   但真实平台的登录/权限/附件路径差异仍需实机确认；`platform.json` 里 apiToken 为本地明文。
+- `state.json`、`platform.json`、`config.json` 和导出物会以 `0600` 写入；题目工作区默认建在 `<workspace>/.ctf-auto/`，插件会在其中创建 `.gitignore`，但用户仍应检查自己的 Git 配置。
 - **模式 chip 与面板渲染未做真浏览器点按实测**：已确认 preset 进入 roster、客户端槽位
   `active:true`（含唯一 conversation.view 与设置页移除）、通道数据正常；若界面未立即出现新模式，刷新一次页面即可。
 - **父会话回退**：某些陈旧 root 会话派发子代理会立刻返回 refusal（无输出）；编排器按「显式调用者 >
@@ -292,4 +288,4 @@ node --test --experimental-test-isolation=none \
 
 ## 许可
 
-仅供授权测试与研究使用。
+代码采用 MIT License，详见 `LICENSE`。仅可在获得授权的 CTF、实验或研究环境中使用；请遵守比赛规则和平台条款。

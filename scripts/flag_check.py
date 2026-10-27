@@ -32,9 +32,13 @@ def check_format(flag: str, pattern: str) -> tuple[bool, str]:
 
 
 def run_checker(checker: str, flag: str) -> tuple[bool, str]:
-    command = f"{checker} {shlex.quote(flag)}"
     try:
-        proc = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=120)
+        command = shlex.split(checker)
+        if not command:
+            return False, "checker 为空"
+        proc = subprocess.run([*command, flag], capture_output=True, text=True, timeout=120)
+    except ValueError as exc:
+        return False, f"checker 参数非法：{exc}"
     except subprocess.TimeoutExpired:
         return False, "checker 超时（120s）"
     output = (proc.stdout or "") + (proc.stderr or "")

@@ -1,7 +1,7 @@
 {
   "name": "@dsh-external/dsh-ctf-auto",
   "version": "0.1.0",
-  "description": "CTF 自动解题编排器：题面/附件 → 每题目独立工作区 → 子代理自主解题（多轮尝试、事实链、卡点登记）→ flag 本地验证与台账；设置页「CTF 自动解题」面板（题板/进度/启停/日志）。平台自动取题与自动提交本版未启用，仅预留 adapter 契约。",
+  "description": "CTF 自动解题编排器：题面/附件/平台题目 → 每题目独立工作区 → 子代理自主解题（多轮尝试、事实链、卡点登记）→ flag 验证与台账；设置页「CTF 自动解题」面板（题板/平台/进度/启停/日志）。",
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -22,14 +22,33 @@
   },
   "files": [
     "lib/",
+    "cards/",
+    "roles/",
+    "scripts/",
     "locale/",
     "docs/",
+    "test/",
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
-    "DESIGN.md"
+    "DESIGN.md",
+    "LICENSE"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node scripts/run-tests.mjs"
+  },
+  "peerDependencies": {
+    "@dsh-external/dsh-scanner-tools": "*"
+  },
+  "peerDependenciesMeta": {
+    "@dsh-external/dsh-scanner-tools": {
+      "optional": true
+    }
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
