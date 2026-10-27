@@ -11,7 +11,7 @@
 |---|---|
 | 宿主工具 | **18 个** `ctf_*` 工具（题板/平台/工作台/报告/Writeup/搜索/管理/诊断） |
 | lib 模块 | 11 个（index/client/store/orchestrator/prompt/preset/ctfd/workbench/report/writeup/search） |
-| 随包脚本 | **0 个**（`scripts/` 不存在；子代理靠 shell/python 现写） |
+| 随包脚本 | `assets/scripts/`：flag 校验、附件分诊、解包、WSL 转发脚本及约定 |
 | 题型知识 | ctf-solver `refs/` **11 张 SKILL.md，共 190 KB**（crypto 42KB / forensics 37KB / misc 27KB…）+ `ctf-playbook` 18KB |
 | 角色 | 1 个解题子代理（角度切换），无独立复核/侦察代理；`independent-review` 技能存在但编排器未调用 |
 | 记忆 | 每工作区 `state.json`（题目/尝试/事实/事件/flag）+ campaign-memory（跨会话、模式作用域） |
@@ -60,7 +60,7 @@
 - **信息搜集角色**：侦察混在 solver prompt 里，没有独立「只出事实清单」的侦察步骤；
 - **角色卡文件**：`prompt.js` 只有通用角色段，没有 3 份可全文注入的角色卡。
 
-**建议**：`roles/{solver,reviewer,recon}.md` 全文拼进 spawn prompt；orchestrator 在登记 verified flag 前派 reviewer（只给原始材料，独立重算，确认/挑战二选一）；attempt 0 先跑 recon。
+**建议**：`assets/roles/{solver,reviewer,recon}.md` 全文拼进 spawn prompt；orchestrator 在登记 verified flag 前派 reviewer（只给原始材料，独立重算，确认/挑战二选一）；attempt 0 先跑 recon。
 
 ## 5. 工具层 🛠️ —— 18 个宿主工具，40 个脚本一个都没有
 
@@ -105,12 +105,12 @@
 
 | 优先级 | 事项 | 落点 |
 |---|---|---|
-| **P0** | 常驻层拆分（resident.md 判定/快答） | `preset.js` persona + 新 `roles/resident.md` |
+| **P0** | 常驻层拆分（resident.md 判定/快答） | `preset.js` persona + 新 `assets/roles/resident.md` |
 | **P0** | 题型自动识别 + 技能加载记录 | `prompt.js` / `ctf_solve_start` / attempt 事件 |
 | **P0** | flag 格式校验 + `verified` 门槛收紧 | `ctf_flag_record` / `prompt.js` |
 | **P0** | 平台 retry/429 退避 + 目标限速 | `lib/ctfd.js` + 新 `lib/ratelimit.js` |
 | **P0** | 全局索引（解决换目录丢板） | 新 `lib/indexStore.js` + 面板「全部工作区」 |
-| **P1** | 3 角色卡 + reviewer/recon 编排 | `roles/*.md` + `orchestrator.js` |
+| **P1** | 3 角色卡 + reviewer/recon 编排 | `assets/roles/*.md` + `orchestrator.js` |
 | **P1** | 知识索引 / 私有题解库检索 | 新 `lib/kb.js` + `ctf_kb_search` |
 | **P1** | WP 打包（zip）+ 附件分诊 | 新 `lib/pack.js` / `lib/triage.js` |
 | **P2** | 125 卡扩充、IDA MCP 接线、WSL 转发、成本统计、浏览器 UI 测试 | 分阶段 |
@@ -138,7 +138,7 @@
 
 | 项 | 状态 | 落点 |
 |---|---|---|
-| 3 张角色卡 + recon/solver 按尝试注入 | ✅ 已实现 | `roles/*.md`、`lib/roles.js`、orchestrator、prompt.js |
+| 3 张角色卡 + recon/solver 按尝试注入 | ✅ 已实现 | `assets/roles/*.md`、`lib/roles.js`、orchestrator、prompt.js |
 | 独立复核（reviewer 子代理） | ✅ 已实现（端到端 VERIFIED 实测） | `ctf_review_flag` / `flag.review` / `buildReviewPrompt` |
 | 私有知识库索引与检索 | ✅ 已实现（writeups + notes，跨工作区） | `lib/kb.js`、`ctf_kb_search`、复盘页检索框 |
 | 附件分诊 | ✅ 已实现（魔数优先 + 下一步提示 + 去重） | `lib/triage.js`、`ctf_triage` |
@@ -167,12 +167,12 @@ Token 级成本不可得：子代理 `startActivation` 的 done 只回 `{stopRea
 
 | 层/项 | 状态 | 落点 |
 |---|---|---|
-| 常驻层 | ✅ 完成（文件化 + 判定表 + 兜底） | `roles/resident.md`、`preset.js` |
-| 题型层 | ✅ 完成（13 类都有卡/策略，技能目录 13） | `cards/ctf-{mobile,cloud,ad,supply}`、`prompt.js`、doctor |
+| 常驻层 | ✅ 完成（文件化 + 判定表 + 兜底） | `assets/roles/resident.md`、`preset.js` |
+| 题型层 | ✅ 完成（13 类都有卡/策略，技能目录 13） | `assets/cards/ctf-{mobile,cloud,ad,supply}`、`prompt.js`、doctor |
 | 知识层导入 | ✅ 完成（导入/列表/删除/检索；内容未填） | `lib/kbimport.js`、`kb.*`、`ctf_kb_import`、知识页 |
 | 记忆层页面 | ✅ 完成（跨工作区 + 黑板分层） | `memory.summary`、`lib/blackboard.js`、记忆页 |
 | 角色层自动复核 | ✅ 完成（开关默认关） | `reviewerEnabled`、watchdog、设置页 |
-| 工具层脚本库 | ✅ 完成（4 个脚本 + 约定） | `scripts/` |
+| 工具层脚本库 | ✅ 完成（4 个脚本 + 约定） | `assets/scripts/` |
 | 125 篇知识卡内容 | ⏳ 按要求暂不填 | — |
 | 真实浏览器 UI 测试 | ⏳ 未做 | — |
 | IDA/MCP | ⏸ 按要求暂缓 | — |
@@ -219,7 +219,7 @@ Token 级成本不可得：子代理 `startActivation` 的 done 只回 `{stopRea
 | 自动复盘 / 本地知识库复用 | ✅ 已有（§22-24） | memory.json、kb |
 | 离线授权/客户端打包/13 平台预置 | ⏳ 不做（商业产品专属，与本插件定位不同） | — |
 
-当前测试：23 个测试文件 / 162 个单测；UI 冒烟 8 页通过。
+当前测试：27 个测试文件 / 174 个单测；UI 冒烟 8 页通过。
 
 ---
 
@@ -232,4 +232,4 @@ Token 级成本不可得：子代理 `startActivation` 的 done 只回 `{stopRea
 | 调度快照/队列 | ✅ | `orchestrator.snapshot()`、`schedule.summary`、`ctf_schedule` |
 | 调度页（并发/排队/节奏/最近完成） | ✅（第 8 个标签） | `lib/client.js` 调度页 + CSS |
 
-当前：25 个模型工具 / 8 个面板标签 / 23 个测试文件 / 162 个单测。
+当前：25 个模型工具 / 8 个面板标签 / 27 个测试文件 / 174 个单测。

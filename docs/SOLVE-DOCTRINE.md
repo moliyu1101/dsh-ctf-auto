@@ -4,7 +4,7 @@
 >
 > 来源（均已读原文）：
 > - DSH `modes/ctf-solver/agent.cordis.yml` persona 铁律、`refs/solve-challenge/SKILL.md`（分诊 + 五步 + 卡点 pivot）、`skills/ctf-playbook/SKILL.md`（flag 真实性主线 / 模块路由表 / 卡点 30-45 分钟 / 收官纪律 / 赛制卡）。
-> - 目标契约 `DESIGN.md` §2/§3（字段与 `buildAttemptPrompt` 的七项必含内容）。
+> - 目标契约 `docs/DESIGN.md` §2/§3（字段与 `buildAttemptPrompt` 的七项必含内容）。
 >
 > 标注约定：**P** = 原则，**R** = 角色硬约束，**L** = 解题循环，**H** = 假设与验证，**E** = 证据落盘，**K** = 卡题换角度，**M** = 模块路由，**F** = flag 验证，**A** = 前序尝试传递，**W** = 工作区协议，**T** = 收尾与未解，**I** = 题面即数据（反注入），**B** = 预算。
 
