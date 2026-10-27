@@ -445,4 +445,7 @@ test("原子落盘：save 后不残留 tmp 文件", (t) => {
 		0,
 		`不应残留 tmp 文件: ${files.join(",")}`,
 	);
+	if (process.platform !== "win32") {
+		assert.equal(fs.statSync(path.join(dir, "state.json")).mode & 0o777, 0o600);
+	}
 });

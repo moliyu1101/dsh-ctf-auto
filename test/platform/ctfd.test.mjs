@@ -524,6 +524,22 @@ test("download: 相对路径拼接、带 token、字节与文件名", async (t) 
 	assert.equal(absolute.filename, "a.zip");
 });
 
+test("download: 跨源附件不携带平台 Token", async () => {
+	let seen = null;
+	const client = createCtfdClient({
+		baseUrl: "https://ctf.example.com",
+		token: "secret-token",
+		fetchImpl: async (url, init) => {
+			seen = { url: String(url), headers: { ...(init.headers || {}) } };
+			return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-type": "application/octet-stream" } });
+		}
+	});
+	const res = await client.download("https://cdn.example.net/challenge.zip");
+	assert.equal(res.ok, true);
+	assert.equal(seen.url, "https://cdn.example.net/challenge.zip");
+	assert.equal(seen.headers.Authorization, undefined);
+});
+
 test("download: maxBytes 上限拒绝", async (t) => {
 	const mock = await startMock({ bigSize: 2048 });
 	t.after(() => mock.close());
@@ -536,6 +552,17 @@ test("download: maxBytes 上限拒绝", async (t) => {
 	const okBig = await client.download("/files/big.bin", { maxBytes: 4096 });
 	assert.equal(okBig.ok, true);
 	assert.equal(okBig.size, 2048);
+});
+
+test("download: 无 Content-Length 时仍按流式上限拒绝", async () => {
+	const client = createCtfdClient({
+		baseUrl: "https://files.example.com",
+		token: "t",
+		fetchImpl: async () => new Response(new Uint8Array(101), { status: 200 })
+	});
+	const res = await client.download("https://files.example.com/big.bin", { maxBytes: 100 });
+	assert.equal(res.ok, false);
+	assert.equal(res.code, "too-large");
 });
 
 test("download: HTTP 错误返回 status", async (t) => {
