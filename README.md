@@ -222,7 +222,7 @@ ctf_solve_start(title="...", category="crypto", statement="...", files=["C:\\...
 ctf_solve_status(id="<返回 id>")
 ```
 
-离线题源样例在 `C:\Users\user\Downloads\YCB\qa\`（三题 + check 校验器）。
+
 
 ## 文件与数据布局
 
