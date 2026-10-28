@@ -54,4 +54,6 @@ flowchart LR
 
 状态库现已提供内容修订检查和单题事务，flag、候选移除、复核结果与提交流水使用统一草稿编辑后提交。旧可变接口仍保留；这一步不涉及跨文件事务或跨进程锁。详见 [状态快照与单题事务](STATE-TRANSACTIONS.md)。
 
+生命周期还会检查未决环境流水与进程内资源占用。`environmentOperationPending` 表示环境仍需核对，新增 `environment_unresolved`、`environment_active`、`resource_in_use` 阻塞原因；相关题目暂不移除或自动沉淀，清理需要排他占用。详见 [资源占用与环境操作恢复](ENVIRONMENT-RESOURCES.md)。
+
 本轮不新增 CI、不修改测试、不运行测试套件；只进行语法和静态差异检查。沙箱改造暂缓，没有改变现有执行隔离能力。
