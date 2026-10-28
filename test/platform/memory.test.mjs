@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { distillCard, scoreMemory, rankMemories, buildMemoryPromptSection, tokenize, extractTech } from "../../lib/memory.js";
+import { distillCard, normalizeCard, scoreMemory, rankMemories, buildMemoryPromptSection, tokenize, extractTech } from "../../lib/memory.js";
 
 const NOTES = [
 	"# Baby Python — 解题记录",
@@ -98,4 +98,28 @@ test("memory: tokenize/extractTech 基础行为", () => {
 	assert.ok(tokenize("ZIP Symlink 任意文件读取").size > 3);
 	assert.ok(extractTech("heap + libc + ROP + seccomp").includes("heap"));
 	assert.deepEqual(extractTech(""), []);
+});
+
+test("memory v2: 结构化字段/置信度/前置/步骤命令", () => {
+	const card = distillCard(CH, { notes: NOTES, notesPath: "C:/ws/notes.md" });
+	assert.equal(card.version, 2);
+	assert.ok(card.fingerprint.length > 0);
+	assert.ok(card.stepDetails.length >= 2);
+	assert.ok(card.stepDetails.some((step) => step.command.includes("readfile.py")));
+	assert.ok(card.prerequisites.length >= 2);
+	assert.ok(card.tooling.includes("unzip") || card.tooling.includes("curl"));
+	assert.equal(card.verification.verified, true);
+	assert.ok(card.confidence > 0.5);
+	assert.equal(card.links.notesPath, "C:/ws/notes.md");
+	assert.equal(card.metrics.attempts, 0);
+});
+
+test("memory v2: normalizeCard 兼容 v1 并补齐结构", () => {
+	const legacy = { id: "mem-old", title: "Old", tech: ["pcap"], steps: ["解包", "重组"], used: 2, usedOk: 1 };
+	const card = normalizeCard(legacy);
+	assert.equal(card.version, 2);
+	assert.equal(card.stepDetails.length, 2);
+	assert.equal(card.metrics.successRate, 0.5);
+	assert.equal(card.kind, "triage");
+	assert.deepEqual(card.prerequisites, []);
 });
