@@ -90,3 +90,38 @@ test("kb: buildKnowledgePromptSection 生成片段", () => {
 	assert.match(section, /结论必须自己在本题复现/);
 	assert.equal(buildKnowledgePromptSection([]), "");
 });
+
+test("kb: Chinese paraphrases share technique terms without matching unrelated documents", () => {
+	const entries = buildKnowledgeIndex({ imported: [
+		{ name: "zip.md", text: "解压附件时保留符号链接，实现任意文件读取。" },
+		{ name: "rsa.md", text: "使用模逆运算恢复RSA私钥，完成密文解密。" }
+	] });
+	const results = rankKnowledge(entries, { statement: "这个压缩包可否通过符号链接读取文件？" });
+	assert.equal(results[0].id, "imported:zip.md");
+	assert.ok(!results.some((entry) => entry.id === "imported:rsa.md"));
+	assert.ok(tokenize("附件符号链接").includes("符号"));
+});
+
+test("kb: metadata-only search works and matching passages are injected instead of introductions", () => {
+	const metadata = [{ id: "meta", title: "SQL injection", category: "web", tags: ["sqli"], text: "unrelated body", mtime: 0 }];
+	assert.equal(searchKnowledge(metadata, "sqli").length, 1);
+	const entries = [{ id: "long", title: "Long document", text: "Introduction filler. ".repeat(120) + "关键技法：使用共模攻击恢复RSA明文。" }];
+	const ranked = rankKnowledge(entries, { title: "RSA", statement: "尝试共模攻击" });
+	assert.equal(ranked.length, 1);
+	assert.match(ranked[0].snippet, /共模攻击/);
+	assert.match(buildKnowledgePromptSection(ranked), /共模攻击/);
+	assert.equal(rankKnowledge([{ ...metadata[0], category: "web" }], { title: "totallydifferent", category: "web" }).length, 0);
+});
+
+test("kb: configured recall counts above three are retained in the prompt", () => {
+	const section = buildKnowledgePromptSection(Array.from({ length: 5 }, (_, n) => ({ title: `entry-${n}`, text: "fixture", score: 0.5 })));
+	assert.match(section, /entry-4/);
+});
+
+test("kb: cached passage tokens refresh when the source text changes", () => {
+	const entry = { title: "fixture", text: "RSA 共模攻击解密" };
+	assert.equal(rankKnowledge([entry], { title: "共模攻击" }).length, 1);
+	entry.text = "PNG 图片隐写提取像素";
+	assert.equal(rankKnowledge([entry], { title: "共模攻击" }).length, 0);
+	assert.equal(rankKnowledge([entry], { title: "图片隐写" }).length, 1);
+});

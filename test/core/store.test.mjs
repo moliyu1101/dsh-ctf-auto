@@ -449,3 +449,50 @@ test("原子落盘：save 后不残留 tmp 文件", (t) => {
 		assert.equal(fs.statSync(path.join(dir, "state.json")).mode & 0o777, 0o600);
 	}
 });
+
+test("store: persistence status reports a failed write and clears after a successful retry", (t) => {
+	const { store, statePath } = makeStore(t);
+	const saved = fs.readFileSync(statePath, "utf8");
+	const rename = fs.renameSync;
+	let failing = true;
+	t.mock.method(fs, "renameSync", (source, destination) => {
+		if (String(destination) === statePath && failing) throw Object.assign(new Error("full"), { code: "ENOSPC" });
+		return rename(source, destination);
+	});
+	store.addChallenge(challengeInput());
+	assert.equal(store.persistenceStatus().dirty, true);
+	assert.equal(store.persistenceStatus().lastError.code, "ENOSPC");
+	assert.equal(fs.readFileSync(statePath, "utf8"), saved);
+	failing = false;
+	assert.equal(store.save(), true);
+	assert.equal(store.persistenceStatus().dirty, false);
+	assert.equal(Object.keys(JSON.parse(fs.readFileSync(statePath)).challenges).length, 1);
+});
+
+test("store: newer formats and read errors preserve the original state instead of resetting it", (t) => {
+	const dir = tempDir(t);
+	const statePath = path.join(dir, "state.json");
+	const future = JSON.stringify({ version: STATE_VERSION + 1, challenges: { future: {} } });
+	fs.writeFileSync(statePath, future);
+	assert.throws(() => createStore(statePath), { code: "UNSUPPORTED_STATE_VERSION" });
+	assert.equal(fs.readFileSync(statePath, "utf8"), future);
+	const read = fs.readFileSync;
+	t.mock.method(fs, "readFileSync", (file, ...args) => {
+		if (String(file) === statePath) throw Object.assign(new Error("denied"), { code: "EACCES" });
+		return read(file, ...args);
+	});
+	assert.throws(() => createStore(statePath), { code: "EACCES" });
+	assert.equal(read(statePath, "utf8"), future);
+	assert.equal(fs.readdirSync(dir).filter((name) => name.includes(".corrupt-")).length, 0);
+});
+
+test("store: corrupt files are never replaced when their preservation backup fails", (t) => {
+	const dir = tempDir(t);
+	const statePath = path.join(dir, "state.json");
+	const original = "broken JSON that must be preserved";
+	fs.writeFileSync(statePath, original);
+	t.mock.method(fs, "renameSync", () => { throw Object.assign(new Error("denied"), { code: "EACCES" }); });
+	t.mock.method(fs, "copyFileSync", () => { throw Object.assign(new Error("denied"), { code: "EACCES" }); });
+	assert.throws(() => createStore(statePath), /无法备份/);
+	assert.equal(fs.readFileSync(statePath, "utf8"), original);
+});

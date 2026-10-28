@@ -63,3 +63,27 @@ test("target: probeTarget 分派 + 无效目标", async () => {
 	assert.equal(none.ok, false);
 	assert.equal(none.state, "invalid");
 });
+test("target: TCP timeout destroys the socket and HTTP readiness cancels streaming bodies", async (t) => {
+	let destroyed = 0;
+	const socket = new EventEmitter();
+	socket.destroy = () => { destroyed++; };
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const pending = probeTcp("127.0.0.1", 80, { timeoutMs: 200, connectImpl: () => socket });
+	t.mock.timers.tick(200);
+	assert.equal((await pending).state, "timeout");
+	assert.equal(destroyed, 1);
+	socket.emit("error", new Error("late error"));
+	assert.equal(destroyed, 1);
+	let cancelled = 0;
+	assert.equal((await probeHttp("http://fixture/", { fetchImpl: async () => ({ status: 200, body: { cancel: async () => { cancelled++; } } }) })).ok, true);
+	assert.equal(cancelled, 1);
+});
+
+test("target: parses IPv6 and URL queries and rejects invalid ports before connecting", async () => {
+	assert.equal(parseTarget("https://[::1]:8443/?x=1").host, "::1");
+	assert.equal(parseTarget("http://example.com?x=1").path, "/?x=1");
+	assert.equal(parseTarget("[::1]:1337").port, 1337);
+	for (const target of ["host:0", "http://host:0/", "[...]:1337", "host:65536", "http://host:99999/", "http://user:password@host/"]) assert.equal(parseTarget(target).kind, "none");
+	const result = await probeTcp("host", 65536, { connectImpl: () => { throw new Error("must not connect"); } });
+	assert.equal(result.state, "invalid");
+});
