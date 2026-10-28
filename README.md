@@ -210,6 +210,7 @@ ctf_platform_import(ids=["uuid-or-id"], start=true)
 - **平台**：`ctf_platform_status`、`ctf_platform_import`、`ctf_platform_submit`、`ctf_platform_reconcile`、`ctf_platform_detect`、`ctf_platform_hints`
 - **管理与导出**：`ctf_challenge_remove`、`ctf_report_export`、`ctf_writeup_export`、`ctf_writeup_pack`、`ctf_review_flag`
 - **本地恢复**：`ctf_challenge_sync`（主会话修复文件后立即重试同步）
+- **任务管理**：`ctf_tasks`、`ctf_task_cancel`、`ctf_task_resolve`（主会话查看任务、请求取消及核对旧执行端）
 - **工作台/检索（主会话和子代理共享）**：`ctf_workbench_list`、`ctf_workbench_read`、`ctf_workbench_write`、`ctf_search`、`ctf_triage`
 - **知识/记忆**：`ctf_kb_import`、`ctf_kb_search`、`ctf_recall`、`ctf_memory_list`、`ctf_memory_distill`
 - **诊断与调度**：`ctf_schedule`、`ctf_target_probe`、`ctf_wsl_run`
@@ -328,6 +329,10 @@ whoami、笔记等）。
 调度器为新尝试分配 `runId`，统一保存创建和收口信息，校验迟到结果及会话绑定。保存失败时暂停新派发并保留进程内待收口计划；定时器、看门狗和详情统一使用 `deadlineAt`。实现范围与恢复限制见 [调度器事务与尝试身份](docs/SCHEDULER-TRANSACTIONS.md)。
 
 解题、复核、提交和环境操作共用进程内资源占用，删除环境需要排他占用并重新检查自动清理资格。环境创建、续期和删除增加持久化流水，未决请求不自动重放；面板「核对环境」支持查询和显式接受稳定观测。详见 [资源占用与环境操作恢复](docs/ENVIRONMENT-RESOURCES.md)。
+
+四类任务进一步接入持久化登记、实例身份、心跳和取消请求。重启及租约超时后，无法确认结束的任务保留为待核对，阻止重跑和环境清理，不按超时自动释放。详情新增「任务与租约」，主会话可用 `ctf_tasks`、`ctf_task_cancel`、`ctf_task_resolve` 管理。已发送的平台操作仍记录真实回显；实现边界见 [统一任务登记、租约与取消](docs/TASK-LEASES.md)。
+
+状态格式写入 v2，兼容读取 v1；旧版程序会拒绝加载 v2，避免降级后绕过任务租约。回退程序需使用匹配版本的完整备份。
 
 记忆库和知识使用统计在读取损坏、权限故障或不支持的版本时保留原文件并报错，不再当作空库保存。复核拒绝后的记忆清理、flag 文件同步增加持久化待办，支持后台恢复和面板重试。详见 [学习数据保护与本地文件恢复](docs/LEARNING-PERSISTENCE.md)。
 
