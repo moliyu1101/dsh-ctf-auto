@@ -236,6 +236,12 @@ ctf_platform_import(ids=["uuid-or-id"], start=true)
 - 设置页「**自动化**」卡：周期自动拉题（间隔/每轮题数）、导入后自动开始、解出后自动提交（默认开）。
 - 对应端点 `pipeline.run`（支持 `dryRun` 预览候选）；自动提交结果写入 `challenge.platformSubmit` 与事件。
 
+## 存储路径（跨会话持久）
+
+- 记忆：默认 `~/.dsh/ctf-auto/memory/memory.json`
+- 复盘：默认 `~/.dsh/ctf-auto/reports/`（Writeup 在 `reports/writeups/`）
+- 设置页「存储路径」可改成任意目录；首次启用时会自动把旧数据复制过去，会话/题板重建也不影响。
+
 ## 平台接入
 
 ### CTFd
