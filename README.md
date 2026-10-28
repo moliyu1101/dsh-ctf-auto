@@ -207,7 +207,7 @@ ctf_platform_import(ids=["uuid-or-id"], start=true)
 ### 主会话可用工具
 
 - **编排**：`ctf_solve_start`、`ctf_board_import`、`ctf_solve_status`、`ctf_solve_stop`、`ctf_solve_retry`、`ctf_solve_log`、`ctf_solve_doctor`
-- **平台**：`ctf_platform_status`、`ctf_platform_import`、`ctf_platform_submit`、`ctf_platform_detect`、`ctf_platform_hints`
+- **平台**：`ctf_platform_status`、`ctf_platform_import`、`ctf_platform_submit`、`ctf_platform_reconcile`、`ctf_platform_detect`、`ctf_platform_hints`
 - **管理与导出**：`ctf_challenge_remove`、`ctf_report_export`、`ctf_writeup_export`、`ctf_writeup_pack`、`ctf_review_flag`
 - **工作台/检索（主会话和子代理共享）**：`ctf_workbench_list`、`ctf_workbench_read`、`ctf_workbench_write`、`ctf_search`、`ctf_triage`
 - **知识/记忆**：`ctf_kb_import`、`ctf_kb_search`、`ctf_recall`、`ctf_memory_list`、`ctf_memory_distill`
@@ -319,6 +319,8 @@ whoami、笔记等）。
 题目摘要与详情新增 `lifecycle`，将执行、验证、提交和环境状态分别表示；原 `status` 保留兼容。`state.get` 与题板状态工具还返回 `lifecycleTotals`，可区分平台确认、待复核和提交未决的题目。单题工具和 Web 写操作共用题目应用服务。
 
 提交结果未知、平台拒绝候选或仍有复核/提交进行时，不再仅凭 `solved` 自动沉淀成功经验；提交未决时保留环境，等待人工处理。实现范围和后续边界见 [题目生命周期与业务入口](docs/CHALLENGE-LIFECYCLE.md)。
+
+平台提交增加每题持久化流水：发送前保存阶段，平台结果先落盘，再更新 flag 和本地文件。进程中断后的未决请求不会自动重发；使用面板「核对平台结果」或 `ctf_platform_reconcile({id})` 查询。平台已解只收口题目状态，不证明某个 flag 正确。确需重提时显式允许重复提交，旧未决记录仍保留；详见 [提交流水与中断恢复](docs/SUBMISSION-RECOVERY.md)。
 
 ## 开发与测试
 
