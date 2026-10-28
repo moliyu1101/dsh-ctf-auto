@@ -58,4 +58,6 @@ flowchart LR
 
 本地文件同步待办使用 `localProjectionPending` 和 `local_projection_pending` 阻止移除与沉淀，也覆盖旧版未登记同步任务的拒绝记录。文件恢复完成后解除阻塞，见 [学习数据保护与本地文件恢复](LEARNING-PERSISTENCE.md)。
 
+`learningUsagePending` 是尚未确认完成的使用统计事件数。它单独阻止移除，不加入成功经验沉淀的 blockers，也不阻止继续解题、提交或环境释放；统计按收口时的结果补记，失败原因显示在题目详情。删除单题和删除会话都遵守这项移除条件。
+
 本轮不新增 CI、不修改测试、不运行测试套件；只进行语法和静态差异检查。沙箱改造暂缓，没有改变现有执行隔离能力。
