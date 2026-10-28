@@ -1,5 +1,7 @@
 # 资源占用与环境操作恢复
 
+解题并发与靶机串行还会统计未决 solver 任务及尚未释放的本地占用，按 taskId 去重；超时后仅结束编排等待不能让其他题提前取得空出的名额。旧实例未知任务也保留名额，直到结束确认或人工核对。详见 [调度器并发名额](SCHEDULER-TRANSACTIONS.md#并发名额与执行端占用)。
+
 ## 本轮范围
 
 `challenge-resources.js` 提供进程内资源准入，`platform-environments.js` 负责环境业务，`environment-journal.js` 负责私有流水。工具、面板、自动清理及配额回收经过同一环境服务，原始平台适配器继续负责协议转换。

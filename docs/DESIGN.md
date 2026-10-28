@@ -152,7 +152,7 @@ export function createOrchestrator(deps)
 //   抛错/拒绝 = 本次尝试 failed（error 记入 attempt）
 
 o.start(id, {agentPreset}?)   // 置 queued + pump()；返回 {ok, queued}
-o.pump()                      // 并发驱动：running<concurrency 时取 queued 启动
+o.pump()                      // 并发驱动：未决 solver 与本地占用合计低于 concurrency 时取 queued 启动
 o.stop(id)                    // interrupt + status=stopped + 事件
 o.stopAll()
 o.retry(id, hint?)            // 往队列重置：status=queued + 可选 hint 写 events
