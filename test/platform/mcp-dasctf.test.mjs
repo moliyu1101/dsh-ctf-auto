@@ -122,3 +122,69 @@ test("mcp-dasctf: 无 token / 工具错误 返回可读错误", async () => {
 	assert.equal(err.ok, false);
 	assert.match(err.error, /AGENT_FORBIDDEN/);
 });
+test("mcp-dasctf: HTTP 429 retries once with the server delay and stops after a repeated 429", async () => {
+	for (const persistent of [false, true]) {
+		let calls = 0;
+		const delays = [];
+		const fetchImpl = async (_url, init) => {
+			const body = JSON.parse(init.body);
+			if (body.method === "initialize") return jsonResponse({ result: {} }, 200, { "mcp-session-id": "sess" });
+			if (body.method === "notifications/initialized") return jsonResponse({}, 202);
+			calls++;
+			if (calls === 1 || persistent) return jsonResponse({ error: { data: { retry_after_ms: 700 } } }, 429);
+			return jsonResponse({ result: { content: [{ type: "text", text: '{"ok":true}' }] } });
+		};
+		const client = createDasctfMcpClient({ token: "fixture", fetchImpl, sleepImpl: async (ms) => delays.push(ms) });
+		assert.equal((await client.callTool("fixture")).ok, !persistent);
+		assert.equal(calls, 2);
+		assert.deepEqual(delays, [700]);
+	}
+});
+
+test("mcp-dasctf: normalized competition metadata survives list, detail and submit", async () => {
+	const seen = [];
+	const fetchImpl = makeMcpFetch({
+		ctf2_agent_next_challenges: () => ({ structuredContent: { items: [{ id: "same", name: "Warmup", source: { type: "competition", competition_id: "contest", stage_id: "final" } }] } }),
+		ctf2_get_competition_challenge: (args) => { seen.push(args); return { structuredContent: { challenge: { id: "same", name: "Warmup" } } }; },
+		ctf2_submit_competition_flag: (args) => { seen.push(args); return { structuredContent: { correct: true } }; }
+	});
+	const platform = createDasctfMcpPlatform({ origin: ORIGIN, token: "fixture", fetchImpl });
+	const item = (await platform.listChallenges()).data[0];
+	assert.equal(item.competitionId, "contest");
+	assert.equal(item.stageId, "final");
+	assert.equal((await platform.getChallenge(item.id, item)).ok, true);
+	assert.equal((await platform.submit(item.id, "CTF{x}", { challengeId: item.id, sourceType: item.type, competitionId: item.competitionId, stageId: item.stageId })).status, "correct");
+	for (const args of seen) {
+		assert.equal(args.competition_id, "contest");
+		assert.equal(args.stage_id, "final");
+	}
+});
+
+test("mcp-dasctf: incorrect and unaccepted flags never become platform-verified", async () => {
+	for (const data of [{ status: "incorrect" }, { message: "not accepted" }, { correct: false, message: "correct" }, { success: true }]) {
+		const platform = createDasctfMcpPlatform({ origin: ORIGIN, token: "fixture", fetchImpl: makeMcpFetch({ ctf2_submit_flag: () => ({ structuredContent: data }) }) });
+		const result = await platform.submit("1", "CTF{wrong}", { groundId: "g" });
+		assert.notEqual(result.status, "correct", JSON.stringify(data));
+		assert.equal(result.flagConfirmed, false);
+	}
+});
+
+test("mcp-dasctf: fresh clients use saved competition metadata without a list request", async () => {
+	const meta = { sourceType: "competition", competitionId: "contest", stageId: "final" };
+	const seen = [];
+	const fetchImpl = makeMcpFetch({
+		ctf2_get_competition_challenge: (args) => { seen.push(args); return { structuredContent: { challenge: { id: "1" } } }; },
+		ctf2_submit_competition_flag: (args) => { seen.push(args); return { structuredContent: { correct: true } }; },
+		ctf2_start_competition_environment: (args) => { seen.push(args); return { structuredContent: { environment: { status: "running" } } }; }
+	});
+	const client = () => createDasctfMcpPlatform({ origin: ORIGIN, token: "fixture", fetchImpl });
+	assert.equal((await client().getChallenge("1", meta)).ok, true);
+	assert.equal((await client().submit("1", "CTF{x}", meta)).status, "correct");
+	assert.equal((await client().environment("start", { id: "1", meta })).ok, true);
+	assert.equal(seen.length, 3);
+	for (const args of seen) {
+		assert.equal(args.challenge_id, "1");
+		assert.equal(args.competition_id, "contest");
+		assert.equal(args.stage_id, "final");
+	}
+});

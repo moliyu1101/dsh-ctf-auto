@@ -111,3 +111,10 @@ test("dasctf: discover 汇总试过的路径", async () => {
 	assert.equal(report.paths.me, "/agent/me/dasctf");
 	assert.ok(report.tried.length >= 2);
 });
+test("dasctf: incorrect status and transport success do not verify a flag", async () => {
+	for (const data of [{ status: "incorrect" }, { status: "wrong" }, { correct: false, status: "correct" }, { success: true }]) {
+		const fetchImpl = fakeFetch({ "/agent/challenge/dasctf/1/submit": () => ({ payload: { success: true, data } }) });
+		const client = createDasctfClient({ token: "fixture", platform: "dasctf", fetchImpl });
+		assert.notEqual((await client.submit(1, "CTF{wrong}")).status, "correct", JSON.stringify(data));
+	}
+});
