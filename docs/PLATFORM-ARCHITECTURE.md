@@ -62,7 +62,7 @@ CTFd 只对 GET/HEAD 执行通用重试。提交或付费提示解锁发生网�
 
 ## 当前边界
 
-平台题面刷新已迁入独立服务，拒绝旧结果覆盖当前题面；附件使用新路径，statement.md 使用持久化投影恢复。初次导入仍走原工作流，详见 [平台题面刷新与文件恢复](PLATFORM-REFRESH.md)。
+平台题面刷新已迁入独立服务，拒绝旧结果覆盖当前题面；附件使用新路径，statement.md 使用持久化投影恢复。初次导入已有持久化准备阶段，附件确认前不派发；详见 [平台刷新](PLATFORM-REFRESH.md) 和 [题目准备与批量移除](CREATION-REMOVAL.md)。
 
 环境业务已迁入 `platform-environments.js`，使用独立流水、进程内资源占用及人工核对入口。solver、review 和 submission 也参与占用，防止清理与消费者并行；详见 [资源占用与环境操作恢复](ENVIRONMENT-RESOURCES.md)。原平台服务的 environment 方法属于底层协议协调入口，宿主业务经过新的环境服务。
 
