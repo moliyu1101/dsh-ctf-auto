@@ -142,7 +142,7 @@ export function nextAngle(n, config?)            // → ANGLES[Math.min(n, ANGLE
 
 ```js
 export function createOrchestrator(deps)
-// deps = { store, spawn, config, now?, logger? }
+// deps = { store, spawn, config, now?, monotonicNow?, logger? }
 // config = { concurrency:2, timeoutMs:1800000, maxAttempts:3, autoRetry:true,
 //            hints:[], extraFlagsRe:[], solverPreset:"ctf-solver" }
 // hints：来自 retry/面板的附加提示，拼进 prompt 的「附加提示」段；同题 2+ 次 attempts 不复用 session
