@@ -209,7 +209,7 @@ ctf_platform_import(ids=["uuid-or-id"], start=true)
 - **编排**：`ctf_solve_start`、`ctf_board_import`、`ctf_solve_status`、`ctf_solve_stop`、`ctf_solve_retry`、`ctf_solve_log`、`ctf_solve_doctor`
 - **平台**：`ctf_platform_status`、`ctf_platform_import`、`ctf_platform_submit`、`ctf_platform_reconcile`、`ctf_platform_detect`、`ctf_platform_hints`
 - **管理与导出**：`ctf_challenge_remove`、`ctf_report_export`、`ctf_writeup_export`、`ctf_writeup_pack`、`ctf_review_flag`
-- **本地恢复**：`ctf_challenge_sync`（主会话修复文件后立即重试同步）
+- **输入与本地恢复**：`ctf_challenge_prepare`（在原记录中重试输入准备）、`ctf_challenge_sync`（主会话修复文件后立即重试同步）
 - **任务管理**：`ctf_tasks`、`ctf_task_cancel`、`ctf_task_resolve`（主会话查看任务、请求取消及核对旧执行端）
 - **工作台/检索（主会话和子代理共享）**：`ctf_workbench_list`、`ctf_workbench_read`、`ctf_workbench_write`、`ctf_search`、`ctf_triage`
 - **知识/记忆**：`ctf_kb_import`、`ctf_kb_search`、`ctf_recall`、`ctf_memory_list`、`ctf_memory_distill`
@@ -340,7 +340,7 @@ whoami、笔记等）。
 
 平台题面刷新已拆出独立服务，异步返回会检查题目与连接是否变化。附件写入新路径并保留旧文件，题面和文件同步待办一起保存；statement.md 写入失败可后台恢复，同步完成前暂停解题与复核。详见 [平台刷新与文件恢复](docs/PLATFORM-REFRESH.md)。
 
-新建及初次导入增加持久化输入准备阶段，附件、题面和笔记确认前不会派发；中断记录保持停止并显示恢复或重新导入方式。会话移除使用一次批量状态提交，成功后才尝试检查归属并清理目录，失败保留文件。规则见 [题目准备与批量移除](docs/CREATION-REMOVAL.md)。
+新建及初次导入增加持久化输入准备阶段，附件、题面和笔记确认前不会派发；中断记录可用面板「重试输入准备」或 `ctf_challenge_prepare({id})` 在原记录上恢复，完成后仍需显式开始。恢复重新读取本地来源或重新下载平台附件，保留笔记、脚本和产物。会话移除使用一次批量状态提交，成功后才尝试检查归属并清理目录，失败保留文件。规则见 [题目准备与批量移除](docs/CREATION-REMOVAL.md)。
 
 状态格式写入 v4，兼容读取 v1/v2/v3；旧程序会拒绝高版本状态，避免降级后绕过任务租约或输入准备待办。回退程序需使用匹配版本的完整备份。
 
