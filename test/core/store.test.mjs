@@ -343,7 +343,7 @@ test("stats: 按状态现算", (t) => {
 		failed: 0,
 		stopped: 1,
 	});
-	assert.deepEqual(store.state.running, { [b.id]: true });
+	assert.deepEqual({ ...store.state.running }, { [b.id]: true });
 });
 
 test("setStatus: 终态自动 endedAt、事件 kind 与 stuckReason", (t) => {
@@ -389,7 +389,9 @@ test("持久化：重开 store 恢复挑战/尝试/flag/fact", (t) => {
 	});
 	store1.addFact(challenge.id, { text: "fact", source: "attempt#1", attempt: 1 });
 
+	store1.close();
 	const store2 = createStore(statePath, { rootDir });
+	t.after(() => store2.close());
 	const loaded = store2.get(challenge.id);
 	assert.ok(loaded);
 	assert.equal(loaded.title, "Fish Joy in HTML5");
@@ -459,7 +461,7 @@ test("store: persistence status reports a failed write and clears after a succes
 		if (String(destination) === statePath && failing) throw Object.assign(new Error("full"), { code: "ENOSPC" });
 		return rename(source, destination);
 	});
-	store.addChallenge(challengeInput());
+	assert.throws(() => store.addChallenge(challengeInput()), { code: "STATE_NOT_DURABLE", applied: true });
 	assert.equal(store.persistenceStatus().dirty, true);
 	assert.equal(store.persistenceStatus().lastError.code, "ENOSPC");
 	assert.equal(fs.readFileSync(statePath, "utf8"), saved);

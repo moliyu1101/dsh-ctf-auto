@@ -27,7 +27,7 @@ test("verified flag is submitted automatically, confirmed by platform, and not s
 	assert.equal(imported.created.length, 1);
 	const id = imported.created[0].localId;
 	const flag = { id, flag: "CTF{regression}", verified: true, method: "local-check", evidence: "checker output: CTF{regression}" };
-	assert.equal((await h.post("flag.record", flag)).verified, true);
+	assert.equal((await h.post("flag.record", flag)).verified, false);
 	await until(async () => {
 		const r = await h.post("challenge.get", { id });
 		return r.challenge?.platformSubmit?.status === "correct";
@@ -108,7 +108,7 @@ test("DASCTF environment-only token works for importing and submitting", async (
 	assert.equal(result.verified, true);
 });
 
-test("failed automatic submissions can be retried after the platform recovers", async (t) => {
+test("unknown submissions require explicit task confirmation before a deliberate retry", async (t) => {
 	const h = await host(t);
 	let healthy = false;
 	h.setRemote((url) => url.endsWith("/submit") && !healthy ? new Response("unavailable", { status: 503 }) : genericRemote(url));
@@ -118,6 +118,13 @@ test("failed automatic submissions can be retried after the platform recovers", 
 	await until(async () => (await h.post("challenge.get", { id })).challenge?.platformSubmit?.status === "error");
 	healthy = true;
 	await h.post("flag.record", flag);
-	await until(async () => (await h.post("challenge.get", { id })).challenge?.platformSubmit?.status === "correct");
+	assert.equal(h.requests.filter((r) => r.url.endsWith("/submit")).length, 1, "an unknown remote outcome must not be replayed automatically");
+	const tasks = (await h.post("task.list", { id })).tasks;
+	const task = tasks.find((task) => task.kind === "submission" && task.phase === "unknown");
+	assert.ok(task);
+	assert.equal((await h.post("task.resolve", { id, taskId: task.taskId, confirmStopped: true, note: "fixture request has completed; platform recovered" })).ok, true);
+	const retried = await h.post("platform.submit", { id, flag: flag.flag, retryUnknown: true });
+	assert.equal(retried.status, "correct");
+	assert.equal((await h.post("challenge.get", { id })).challenge.lifecycle.submission, "accepted");
 	assert.equal(h.requests.filter((r) => r.url.endsWith("/submit")).length, 2);
 });

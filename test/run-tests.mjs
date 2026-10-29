@@ -16,7 +16,9 @@ function walk(dir) {
 
 walk(path.join(root, "test"));
 files.sort();
-const result = spawnSync(process.execPath, ["--test", ...files], { stdio: "inherit", env: process.env });
+const requested = Number(process.env.CTF_TEST_CONCURRENCY);
+const concurrency = Number.isInteger(requested) && requested >= 1 && requested <= 8 ? requested : 2;
+const result = spawnSync(process.execPath, ["--test", `--test-concurrency=${concurrency}`, ...files], { stdio: "inherit", env: process.env });
 if (result.error) {
 	console.error(result.error.message);
 	process.exit(1);

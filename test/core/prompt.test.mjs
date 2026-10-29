@@ -97,7 +97,7 @@ test("buildAttemptPrompt: 首次尝试覆盖 §3 的 1-5/7 条", () => {
 	assert.match(prompt, /c-m1x2y3z-a7f/);
 	assert.match(prompt, /题目描述：从目标服务拿到 flag/);
 	// 工作区协议
-	for (const token of ["notes.md", "scripts/", "artifacts/", "flag.json", '"verified":true', "mkdir -p scripts artifacts"]) {
+	for (const token of ["notes.md", "scripts/", "artifacts/", "flag.json", "由宿主根据台账同步", "mkdir -p scripts artifacts"]) {
 		assert.ok(prompt.includes(token), `应包含工作区协议 token: ${token}`);
 	}
 	// 解题循环 + 技能
@@ -301,12 +301,12 @@ test("classifyAttempt: incomplete / failed / timeout / 提前收口", () => {
 		classifyAttempt({ stopReason: "refusal", outputText: "" }).outcome,
 		"incomplete",
 	);
-	// verified 但非 completed：按契约只有 completed + verified 才是 solved
+	// 已确认的正确性优先于超时/中断原因，避免复盘自相矛盾。
 	const timeoutWithFlag = classifyAttempt({
 		stopReason: "timeout",
 		flags: [{ value: "flag{late}", verified: true }],
 	});
-	assert.equal(timeoutWithFlag.outcome, "timeout");
+	assert.equal(timeoutWithFlag.outcome, "solved");
 	assert.match(timeoutWithFlag.summary, /flag\{late\}/);
 });
 

@@ -90,6 +90,7 @@ function makeOrch(t, options = {}) {
 			...options.config,
 		},
 		now,
+		monotonicNow: options.fakeMonotonic ? () => clock.t : undefined,
 		logger,
 	});
 	const addChallenge = (overrides = {}) =>
@@ -149,7 +150,7 @@ test("并发上限：running 达到 concurrency 后排队，腾出槽位再启�
 });
 
 test("超时看门狗 tick：interrupt + timeout 收口", async (t) => {
-	const ctx = makeOrch(t, { config: { timeoutMs: 60000, maxAttempts: 1 } });
+	const ctx = makeOrch(t, { fakeMonotonic: true, config: { timeoutMs: 60000, maxAttempts: 1 } });
 	const challenge = ctx.addChallenge({ maxAttempts: 1 });
 	ctx.orchestrator.start(challenge.id);
 	await waitFor(() => ctx.calls.length === 1, "spawn");
@@ -252,7 +253,9 @@ test("成功收口：ctf_flag_record 的 verified flag → solved + endedAt + se
 	assert.equal(ctx.orchestrator.isRunning(challenge.id), false);
 
 	// 落盘校验：重新打开状态库仍是 solved
+	ctx.store.close();
 	const reopened = createStore(ctx.statePath, { rootDir: ctx.store.state.rootDir });
+	t.after(() => reopened.close());
 	const persisted = reopened.get(challenge.id);
 	assert.equal(persisted.status, "solved");
 	assert.equal(persisted.flags[0].value, "flag{real}");
@@ -278,7 +281,8 @@ test("stop：interrupt + status=stopped，且不自动重试", async (t) => {
 	const stopped = ctx.store.get(challenge.id);
 	assert.equal(stopped.status, "stopped");
 	assert.equal(stopped.attempts.length, 1, "stop 后不应自动重试");
-	assert.equal(stopped.attempts[0].stopReason, "aborted");
+	assert.equal(stopped.attempts[0].stopReason, "stopped-by-user");
+	assert.match(stopped.attempts[0].summary, /可手动重试/);
 	assert.equal(stopped.attempts[0].status, "aborted");
 	assert.equal(ctx.handles[0].interrupted, true);
 	assert.ok(stopped.events.some((event) => event.kind === "stopped"));
@@ -402,7 +406,7 @@ test("spawn request 契约：字段齐全、agentPreset 默认 ctf-solver、prom
 	assert.match(request.prompt, /运行 echo 后把 TEST\{ok\} 作为 flag 验证记录/);
 	assert.ok(request.prompt.includes("2023-11-14T22:13:20.000Z"), "now 绝对时间");
 	assert.ok(request.prompt.includes("2023-11-14T22:23:20.000Z"), "deadline 绝对时间");
-	assert.match(request.prompt, /本次尝试截止/);
+	assert.match(request.prompt, /本次尝试预计截止/);
 	assert.match(request.prompt, /R-1/);
 
 	ctx.handles[0].resolve();
@@ -441,6 +445,7 @@ test("close：取消 timer、interrupt 运行中、关闭后拒绝 start", async
 	const result = ctx.orchestrator.close();
 	assert.deepEqual(result.stopped, [challenge.id]);
 	await waitFor(() => ctx.store.get(challenge.id).status === "stopped", "close 后 stopped");
+	await ctx.orchestrator.whenIdle();
 	assert.equal(ctx.handles[0].interrupted, true);
 	assert.equal(ctx.orchestrator.isRunning(challenge.id), false);
 	const afterClose = ctx.orchestrator.start(challenge.id);
@@ -464,29 +469,30 @@ test("whenIdle：自动重试链全部跑完后才返回", async (t) => {
 	assert.equal(challengeAfter.status, "stuck");
 });
 
-test("store.save 抛错也不崩状态机", async (t) => {
-	const ctx = makeOrch(t, {
-		handler: (handle, request, store) => {
-			store.addFlag(request.challenge.id, {
-				value: "flag{diskless}",
-				verified: true,
-				evidence: "ok",
-				method: "local-check",
-			});
-			handle.resolve({ stopReason: "completed", outputText: "" });
-		},
-	});
+test("completion write failure is observable and recovers without replaying the solver", async (t) => {
+	let failing = false;
+	const ctx = makeOrch(t, { handler(handle, request, store) {
+		store.addFlag(request.challenge.id, { value: "flag{diskless}", verified: true, evidence: "checker reproduced", method: "local-check" });
+		failing = true;
+		handle.resolve({ stopReason: "completed", outputText: "" });
+	} });
 	const challenge = ctx.addChallenge();
-	ctx.store.save = () => {
-		throw new Error("disk full");
-	};
+	const rename = fs.renameSync;
+	t.mock.method(fs, "renameSync", (source, destination) => {
+		if (String(destination) === ctx.statePath && failing) throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+		return rename(source, destination);
+	});
 	ctx.orchestrator.start(challenge.id);
 	await ctx.orchestrator.whenIdle();
+	assert.equal(ctx.store.persistenceStatus().dirty, true);
+	assert.equal(ctx.store.persistenceStatus().lastError.code, "ENOSPC");
+	failing = false;
+	assert.equal(ctx.store.save(), true);
+	ctx.orchestrator.tick();
 	assert.equal(ctx.store.get(challenge.id).status, "solved");
-	assert.ok(
-		ctx.logs.some((entry) => entry[0] === "error" && String(entry[1]).includes("store.save")),
-		"应记录 save 失败日志",
-	);
+	assert.equal(ctx.store.get(challenge.id).attempts[0].status, "completed");
+	assert.equal(ctx.calls.length, 1);
+	assert.equal(ctx.orchestrator.snapshot().pendingCompletions, 0);
 });
 
 test("记忆召回：相似打法卡注入 prompt、记录 attempt.memories、解出后记 usedOk", async () => {

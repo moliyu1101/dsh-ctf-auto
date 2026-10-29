@@ -30,7 +30,7 @@ function solvedChallenge() {
 		target: "http://1.2.3.4:8080",
 		dir: "C:/YCB/.ctf-auto/fish-joy-abc123",
 		platform: { kind: "ctfd", baseUrl: "https://ctf.example.com", challengeId: 101 },
-		flags: [{ value: "CTF{demo_flag}", verified: true, method: "local-check", evidence: "check.py -> OK" }],
+		flags: [{ value: "CTF{demo_flag}", verified: true, method: "platform", evidence: "platform returned correct" }],
 		attempts: [{ n: 1, angle: "recon-first", status: "completed", summary: "静态解码成功" }],
 		facts: [{ at: 1700000010000, text: "[结论] 混淆块 decodeURIComponent + RC4" }]
 	};
@@ -147,4 +147,11 @@ test("buildWriteup: 空题也能生成", () => {
 	assert.match(md, /^# Empty/);
 	assert.match(md, /（未提供题面）/);
 	assert.match(md, /（未记录解题步骤）/);
+});
+
+test("buildWriteup: rejected or only locally checked platform flags are not exported as solved", () => {
+	for (const patch of [{ method: "local-check" }, { rejected: true }]) {
+		const ch = solvedChallenge(); Object.assign(ch.flags[0], patch);
+		assert.doesNotMatch(buildWriteup(ch, {}), /解出 flag/);
+	}
 });
