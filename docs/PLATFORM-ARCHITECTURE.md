@@ -23,6 +23,7 @@ flowchart TD
 | `platform-service.js` | 校验与保存配置、适配器注册、能力声明、客户端缓存、来源绑定、环境操作调度 |
 | `platform-operations.js` | 按资源串行执行、合并并发读取、合并相邻相同写操作、限制待处理任务数量 |
 | `platform-submissions.js` | 手动和自动提交、提交编号与状态、平台回显登记、已解缓存、关闭时的状态保护 |
+| `platform-refresh.js` | 题面刷新队列、异步结果冲突检查、附件暂存与独占安装、状态及文件同步待办提交 |
 | `platform-identity.js` | 不含凭据的平台来源和题目来源标识 |
 | 各适配器 | 平台协议、数据字段与错误响应转换 |
 
@@ -60,6 +61,8 @@ DASCTF 客户端保留 MCP 初始化状态，支持没有会话 ID 的已初始�
 CTFd 只对 GET/HEAD 执行通用重试。提交或付费提示解锁发生网络错误时，不能据此断定平台没有执行，调用者应查询平台状态后决定是否再次操作。
 
 ## 当前边界
+
+平台题面刷新已迁入独立服务，拒绝旧结果覆盖当前题面；附件使用新路径，statement.md 使用持久化投影恢复。初次导入仍走原工作流，详见 [平台题面刷新与文件恢复](PLATFORM-REFRESH.md)。
 
 环境业务已迁入 `platform-environments.js`，使用独立流水、进程内资源占用及人工核对入口。solver、review 和 submission 也参与占用，防止清理与消费者并行；详见 [资源占用与环境操作恢复](ENVIRONMENT-RESOURCES.md)。原平台服务的 environment 方法属于底层协议协调入口，宿主业务经过新的环境服务。
 
