@@ -36,6 +36,7 @@ function Panel(props) {
 	var platformOpenS = useState(false), platformOpen = platformOpenS[0], setPlatformOpen = platformOpenS[1];
 	var platformStatusS = useState(null), platformStatus = platformStatusS[0], setPlatformStatus = platformStatusS[1];
 	var reportS = useState(null), report = reportS[0], setReport = reportS[1];
+	var sessionExportS = useState(false), sessionExportBusy = sessionExportS[0], setSessionExportBusy = sessionExportS[1];
 	var reportBusyS = useState(false), reportBusy = reportBusyS[0], setReportBusy = reportBusyS[1];
 	var tabS = useState("overview"), tab = tabS[0];
 	function mayLeave() { return !notesDirtyRef.current || window.confirm("题目笔记尚未保存。离开后将丢失这些修改，是否继续？"); }
@@ -1655,6 +1656,23 @@ function hlKb(text, query) {
 			else say((r && r.error) || "打包失败", true);
 		});
 	}
+	async function exportWorkspaceConversation() {
+		if (sessionExportBusy || !sessionId) return;
+		setSessionExportBusy(true);
+		try {
+			var token = await csrfOf();
+			var response = await sendPost(token, 'sessions.export.download', { sessionId: sessionId });
+			if (response.status === 403) { delete csrfCache[API_BASE]; response = await sendPost(await csrfOf(), 'sessions.export.download', { sessionId: sessionId }); }
+			if (!response.ok) { var failure = await response.json(); throw Error(failure.error || '会话导出失败'); }
+			var blob = await response.blob();
+			var link = document.createElement('a'), url = URL.createObjectURL(blob);
+			link.href = url; link.download = (response.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'workspace-ai-sessions.tar.gz';
+			document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+			var complete = response.headers.get('x-dsh-export-complete') === 'true';
+			say('已导出 ' + response.headers.get('x-dsh-export-sessions') + ' 个会话' + (complete ? '；原始对话与附件清单已打包' : '；有 ' + response.headers.get('x-dsh-export-issues') + ' 项缺失或快照说明，请查看 manifest.json'), !complete);
+		} catch (error) { say(error.message || '会话导出失败', true); }
+		finally { setSessionExportBusy(false); }
+	}
 	function exportReport(full) {
 		if (reportBusy) return;
 		setReportBusy(true);
@@ -2081,6 +2099,7 @@ function hlKb(text, query) {
 						h("h1", { className: "dsh-ctf-pagetitle" }, currentTab.label),
 						h("div", { className: "dsh-ctf-pagedesc" }, currentTab.desc)),
 					h("div", { className: "dsh-ctf-topbar-actions" },
+						h("button", { type: "button", className: "dsh-ctf-btn", disabled: sessionExportBusy || !sessionId || allScope, title: "导出当前工作区主会话、子代理原始事件和关联附件，保留比赛 AI 使用记录", onClick: exportWorkspaceConversation }, h(Icon, { name: "download", size: 15 }), sessionExportBusy ? "正在导出会话…" : "导出工作区会话"),
 						h("button", { type: "button", className: "dsh-ctf-iconbtn", onClick: function () { setCommandOpen(true); }, "aria-label": "快速查找", title: "查找页面或题目", "aria-haspopup": "dialog" }, h(Icon, { name: "search" })),
 						isView ? h("button", {
 							type: "button",
@@ -2093,20 +2112,6 @@ function hlKb(text, query) {
 							title: "导出复盘", "aria-label": "导出复盘",
 							onClick: exportReport
 						}, h(Icon, { name: "download", size: 15 }), h("span", { className: "dsh-ctf-btn-text" }, reportBusy ? "导出中…" : "导出复盘")) : null,
-						isView && !allScope && tab === "platform" && platformStatus && platformStatus.configured ? h("button", {
-							type: "button", className: "dsh-ctf-btn is-ghost", disabled: !!busy,
-							title: "自动拉取平台未解题 → 导入 → 立即开始（解出后按设置自动提交）", "aria-label": "全自动跑板",
-							onClick: function () {
-								setBusy("pipeline");
-								request("pipeline.run", { sessionId: sessionId }).then(function (r) {
-									setBusy("");
-									if (r && r.ok) {
-										say("全自动：导入 " + (r.imported || 0) + " 题" + ((r.started || []).length ? "，已开始 " + r.started.length : "") + (r.errors && r.errors.length ? "，错误 " + r.errors.length : ""));
-										reload();
-									} else say((r && r.error) || "全自动跑板失败", true);
-								});
-							}
-						}, h(Icon, { name: "spark", size: 15 }), h("span", { className: "dsh-ctf-btn-text" }, busy === "pipeline" ? "拉取中…" : "全自动跑板")) : null,
 						isView && !allScope && tab === "board" && boardStartable > 0 ? h("button", {
 							type: "button", className: "dsh-ctf-btn is-primary", disabled: !!busy,
 							title: "把当前题板所有未解题加入调度队列", "aria-label": "一键开始",

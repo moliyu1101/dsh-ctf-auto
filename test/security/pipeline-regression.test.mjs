@@ -128,3 +128,96 @@ test("unknown submissions require explicit task confirmation before a deliberate
 	assert.equal((await h.post("challenge.get", { id })).challenge.lifecycle.submission, "accepted");
 	assert.equal(h.requests.filter((r) => r.url.endsWith("/submit")).length, 2);
 });
+
+test("pipeline rejects a stale platform connection after an in-flight list request", async (t) => {
+	const h = await host(t);
+	let release, started;
+	const waiting = new Promise((resolve) => { started = resolve; });
+	h.setRemote(async (url) => {
+		if (url.endsWith('/api/challenges')) { started(); await new Promise((resolve) => { release = resolve; }); }
+		return genericRemote(url);
+	});
+	await h.post('platform.config.set', { kind: 'generic', baseUrl: 'https://platform-a.test', apiToken: 'fixture-token', profile: null });
+	const run = h.post('pipeline.run', { dryRun: true });
+	await waiting;
+	await h.post('platform.config.set', { baseUrl: 'https://platform-b.test' });
+	release();
+	const result = await run;
+	assert.equal(result.code, 'STALE_PLATFORM_CONNECTION');
+	assert.equal((await h.post('state.get')).challenges.length, 0);
+});
+
+test("pipeline does not fall back to another workspace for an unavailable session", async (t) => {
+	const h = await host(t); h.setRemote(genericRemote);
+	await h.post('platform.config.set', { kind: 'generic', baseUrl: 'https://platform-a.test', apiToken: 'fixture-token', profile: null });
+	const result = await h.post('pipeline.run', { sessionId: 'missing-session' });
+	assert.equal(result.code, 'PIPELINE_SESSION_UNAVAILABLE');
+	assert.equal(h.requests.length, 0);
+});
+
+test("explicit pipeline start uses the requesting session even when automatic starts are disabled", async (t) => {
+	const h = await host(t); h.setRemote(genericRemote);
+	await h.post('platform.config.set', { kind: 'generic', baseUrl: 'https://platform-a.test', apiToken: 'fixture-token', profile: null });
+	assert.equal((await h.post('config.set', { patch: { autoSolveImported: false } })).ok, true);
+	const result = await h.post('pipeline.run', { start: true, sessionId: 'a' });
+	assert.equal(result.ok, true, JSON.stringify(result));
+	assert.equal(result.imported, 1);
+	assert.equal(result.started.length, 1);
+	const detail = await h.post('challenge.get', { id: result.created[0].localId });
+	assert.equal(detail.challenge.driverSession, 'a');
+});
+
+test('pipeline applies its batch limit after deduplicating platform identities', async (t) => {
+ const h = await host(t);
+ h.setRemote((url) => url.endsWith('/api/challenges') ? json({data:[{id:'1',name:'A'},{id:'1',name:'A duplicate'},{id:'2',name:'B'}]}) : genericRemote(url));
+ await h.post('platform.config.set', {kind:'generic',baseUrl:'https://platform-a.test',apiToken:'fixture-token',profile:null});
+ const result=await h.post('pipeline.run',{dryRun:true,limit:2});
+ assert.deepEqual(result.candidates.map(x=>x.id),['1','2']);
+});
+
+test('platform discovery annotates imports only in the requesting workspace', async (t) => {
+ const h = await host(t); h.setRemote(genericRemote);
+ const imported = await importGeneric(h);
+ const a = await h.post('platform.challenges', {sessionId:'a'});
+ const b = await h.post('platform.challenges', {sessionId:'b'});
+ assert.equal(a.challenges[0].local.id, imported.created[0].localId);
+ assert.equal(b.challenges[0].local, null);
+ assert.equal((await h.post('pipeline.run',{sessionId:'a',dryRun:true})).candidates.length,0);
+ assert.equal((await h.post('pipeline.run',{sessionId:'b',dryRun:true})).candidates.length,1);
+});
+
+test('platform status does not present an old connection as current after config changes', async (t) => {
+ const h=await host(t); let release,started;
+ const waiting=new Promise(resolve=>{started=resolve;});
+ h.setRemote(async url=>{if(url.endsWith('/api/challenges')){started();await new Promise(resolve=>{release=resolve;});}return genericRemote(url);});
+ await h.post('platform.config.set',{kind:'generic',baseUrl:'https://platform-a.test',apiToken:'fixture-token',profile:null});
+ const check=h.post('platform.status'); await waiting;
+ await h.post('platform.config.set',{baseUrl:'https://platform-b.test'});release();
+ assert.equal((await check).code,'STALE_PLATFORM_CONNECTION');
+});
+
+test('discovery snapshot imports the selected source without fetching another list and replays safely', async (t) => {
+ const h=await host(t);h.setRemote(genericRemote);
+ await h.post('platform.config.set',{kind:'generic',baseUrl:'https://platform-a.test',apiToken:'fixture-token',profile:null});
+ const list=await h.post('platform.challenges');
+ assert.ok(list.snapshotId);
+ const payload={snapshotId:list.snapshotId,sourceKeys:[list.challenges[0].sourceKey],start:false};
+ const first=await h.post('platform.import',payload);
+ assert.equal(first.created.length,1);
+ assert.equal(h.requests.filter(r=>r.url.endsWith('/api/challenges')).length,1);
+ const repeat=await h.post('platform.import',payload);
+ assert.equal(repeat.created.length,0);assert.equal(repeat.skipped.length,1);
+ assert.equal((await h.post('state.get')).challenges.length,1);
+});
+
+test('discovery selection is bound to its session and platform generation', async (t) => {
+ const h=await host(t);h.setRemote(genericRemote);
+ await h.post('platform.config.set',{kind:'generic',baseUrl:'https://platform-a.test',apiToken:'fixture-token',profile:null});
+ const list=await h.post('platform.challenges');const payload={snapshotId:list.snapshotId,sourceKeys:[list.challenges[0].sourceKey]};
+ assert.equal((await h.post('platform.import',{...payload,sessionId:'b'})).code,'DISCOVERY_SCOPE_CHANGED');
+ assert.equal((await h.post('platform.import',{...payload,sourceKeys:['tampered']})).code,'SELECTION_INVALID');
+ await h.post('platform.config.set',{baseUrl:'https://platform-b.test'});
+ assert.equal((await h.post('platform.import',payload)).code,'STALE_PLATFORM_CONNECTION');
+ assert.equal((await h.post('platform.import',{...payload,snapshotId:'old-instance'})).code,'DISCOVERY_EXPIRED');
+ assert.equal((await h.post('state.get')).challenges.length,0);
+});

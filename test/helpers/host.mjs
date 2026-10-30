@@ -48,6 +48,6 @@ export async function host(t, config = {}, services = {}) {
 	const post = async (endpoint, body = {}) => (await nativeFetch(`${base}/${endpoint}`, {
 		method: "POST", headers: { "content-type": "application/json", "x-dsh-csrf": token }, body: JSON.stringify({ sessionId: "a", ...body })
 	})).json();
-	return { post, tools, requests, agents, root, dispose, tick() { watchdog(); }, setRemote(fn) { remote = fn; } };
+	return { post, rawPost: (endpoint, body = {}) => nativeFetch(`${base}/${endpoint}`, { method: "POST", headers: { "content-type": "application/json", "x-dsh-csrf": token }, body: JSON.stringify({ sessionId: "a", ...body }) }), tools, requests, agents, root, dispose, tick() { watchdog(); }, setRemote(fn) { remote = fn; } };
 }
 

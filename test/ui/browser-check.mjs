@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { createFixture } from './fixture.mjs';
 import { host } from '../helpers/host.mjs';
+import { buildTarGz } from '../../lib/pack.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const require=createRequire(process.env.CTF_UI_DEPS ? path.join(path.resolve(process.env.CTF_UI_DEPS),'package.json') : import.meta.url);
 const {chromium}=require('playwright');
@@ -18,7 +19,7 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(assets[url.pathname]){res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(assets[url.pathname]));return;}
   if(url.pathname.startsWith('/dsh-ctf-auto/')){const chunks=[];for await(const c of req)chunks.push(c);const p=JSON.parse(Buffer.concat(chunks).toString()||'{}');res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.pathname.endsWith('/csrf')?{token:'fixture-csrf'}:await responder(url.pathname.split('/').pop(),p)));return;}
-  res.setHeader('Content-Type','text/html');res.end(html.replace('sessionId:\"demo\"','sessionId:\"'+session+'\"'));
+  res.setHeader('Content-Type','text/html');res.end(html.replace("sessionId:'demo'", "sessionId:" + JSON.stringify(session)));
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch({executablePath:process.env.CTF_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
@@ -32,6 +33,8 @@ async function noOverflow(){const size=await page.evaluate(()=>({scroll:document
 let checks=0;function passed(name){checks++;console.log('PASS '+name);}
 try {
  await page.goto('http://127.0.0.1:'+server.address().port);await visible(page.getByRole('heading',{name:'每一步验证，都有迹可循。'}));await shot('overview-light');await noOverflow();passed('overview renders live API data');
+ await page.route('**/dsh-ctf-auto/sessions.export.download',route=>route.fulfill({status:200,headers:{'content-type':'application/gzip','content-disposition':'attachment; filename="workspace-ai-sessions-fixture.tar.gz"','x-dsh-export-complete':'false','x-dsh-export-sessions':'2','x-dsh-export-issues':'1'},body:buildTarGz([{name:'manifest.json',data:'{"complete":false}'}])}));
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'导出工作区会话',exact:true}).click();const downloaded=await downloadPromise;assert.equal(downloaded.suggestedFilename(),'workspace-ai-sessions-fixture.tar.gz');await visible(page.getByText(/有 1 项缺失或快照说明/));await page.unroute('**/dsh-ctf-auto/sessions.export.download');passed('one-click session archive download reports incomplete snapshots');
  await nav('题目工作台').click();await visible(page.getByRole('button',{name:'打开题目：Serpent cipher'}));await shot('board-light');
  await page.getByLabel('搜索题目',{exact:true}).fill('RSA');await visible(page.getByRole('button',{name:'打开题目：RSA 的另一面'}));assert.equal(await page.locator('.dsh-ctf-card').count(),1);await page.getByLabel('搜索题目',{exact:true}).fill('');passed('board search filters actual rows');
  await page.locator('.dsh-ctf-card').filter({has:page.getByRole('button',{name:'打开题目：Serpent cipher'})}).getByRole('button',{name:'停止',exact:true}).click();
@@ -79,6 +82,20 @@ try {
  await experiment('parse-input','输入能否解析为有效记录？');await page.getByRole('button',{name:'保存实验',exact:true}).click();await visible(page.getByText('输入能否解析为有效记录？',{exact:true}));
  await experiment('validate-record','解析后记录是否满足约束？');await page.getByRole('button',{name:'添加前置实验',exact:true}).click();await page.getByLabel('锁定版本',{exact:true}).check();await page.getByRole('button',{name:'保存实验',exact:true}).click();await visible(page.getByText('解析后记录是否满足约束？',{exact:true}));const board=await actual.post('experiment.list',{id:created.id});const child=board.rows.find(r=>r.key==='validate-record');assert.equal(child.dependsOn[0].key,'parse-input');assert.equal(child.dependsOn[0].version,1);await shot('real-experiment-prerequisites');passed('real host prerequisite editor preserves version pins');
  await page.getByRole('tab',{name:'蜂群协作',exact:true}).click();await visible(page.getByText('蜂群协作尚未开启'));await page.getByRole('tab',{name:'学习反馈',exact:true}).click();await visible(page.getByText('尚无可评价的资料'));passed('real host empty collaboration states');
+ actual.setRemote((url)=>new Response(JSON.stringify(url.endsWith('/api/challenges')?{data:Array.from({length:24},(_,i)=>({id:'p'+(i+1),name:i===0?'Flow first':i===1?'Flow second':'Flow '+(i+1),category:i%2?'web':'crypto'}))}:{data:{id:url.endsWith('/p2')?'p2':'p1',name:url.endsWith('/p2')?'Flow second':'Flow first',description:'Platform fixture statement'}}),{status:200}));
+ await actual.post('platform.config.set',{kind:'generic',baseUrl:'https://platform-fixture.test',apiToken:'test-token',profile:null});
+ await nav('平台接入').click();await page.getByRole('button',{name:'发现题目',exact:true}).click();await visible(page.getByText('Flow second',{exact:true}));
+ await page.locator('.dsh-ctf-prow').filter({hasText:'Flow second'}).getByRole('checkbox').check();
+ assert.equal(await page.locator('.dsh-ctf-connect-row').count(),20);await page.getByRole('button',{name:'下一页',exact:true}).click();await page.locator('.dsh-ctf-prow').filter({hasText:'Flow 24'}).getByRole('checkbox').check();
+ await page.getByRole('group',{name:'题库状态筛选'}).getByRole('button',{name:'已选择',exact:true}).click();assert.equal(await page.locator('.dsh-ctf-connect-row').count(),2);
+ await page.getByRole('button',{name:'移除题目：Flow 24',exact:true}).click();assert.equal(await page.locator('.dsh-ctf-connect-row').count(),1);await page.getByRole('group',{name:'题库状态筛选'}).getByRole('button',{name:'可导入',exact:true}).click();
+ await page.getByLabel('平台题目分类',{exact:true}).selectOption('crypto');assert.equal(await page.locator('.dsh-ctf-connect-row').count(),12);assert.equal(await page.getByRole('button',{name:'移除题目：Flow second',exact:true}).count(),1);await page.getByLabel('平台题目分类',{exact:true}).selectOption('');passed('platform pagination, classification and cross-page batch selection');
+ await shot('platform-catalog-light');await page.evaluate(()=>document.body.setAttribute('data-ds-dark-theme',''));await shot('platform-catalog-dark');await page.setViewportSize({width:390,height:844});await noOverflow();await shot('platform-catalog-mobile');await page.setViewportSize({width:1440,height:1100});await page.evaluate(()=>document.body.removeAttribute('data-ds-dark-theme'));passed('platform catalog fits mobile and dark theme');
+ await page.getByLabel('附件准备完成后开始解题').uncheck();await page.getByRole('button',{name:'仅导入所选题目',exact:true}).click();await visible(page.getByRole('heading',{name:'处理结果',exact:true}));
+ const platformRows=(await actual.post('state.get')).challenges.filter(c=>c.title==='Flow second'||c.title==='Flow first');assert.equal(platformRows.length,1);assert.equal((await actual.post('challenge.get',{id:platformRows[0].id})).challenge.platform.challengeId,'p2');passed('real platform discovery snapshot imports only the selected challenge');
+ await page.getByLabel('平台地址',{exact:true}).fill('https://changed.test');assert.equal(await page.getByRole('button',{name:'发现题目',exact:true}).isDisabled(),true);passed('unsaved connection changes invalidate discovery');
+ await page.getByText('高级适配设置',{exact:true}).click();await page.getByRole('button',{name:'分页列表模板',exact:true}).click();assert.equal(JSON.parse(await page.getByLabel('通用适配配置',{exact:true}).inputValue()).pagination.pageSize,50);await page.getByRole('button',{name:'API Key 模板',exact:true}).click();assert.equal(JSON.parse(await page.getByLabel('通用适配配置',{exact:true}).inputValue()).auth.header,'X-API-Key');passed('generic platform templates populate editable configuration');
+ await shot('platform-workflow');
  assert.deepEqual(errors,[]);passed('no browser runtime errors or React warnings');
  console.log(JSON.stringify({checks,artifacts:out,requests:fixture.calls.length}));
-} finally {await browser.close();await new Promise(resolve=>server.close(resolve));for(const cleanup of cleanups.reverse())await cleanup();}
+} catch(error) { console.error(await page.locator('.dsh-ctf-platform-workflow').innerText().catch(()=>'')); await shot('failure'); throw error; } finally {await browser.close();await new Promise(resolve=>server.close(resolve));for(const cleanup of cleanups.reverse())await cleanup();}

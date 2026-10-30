@@ -76,3 +76,39 @@ test("generic: 无 fetch / 空 baseUrl / download 不支持", async () => {
 	assert.equal(download.ok, false);
 	assert.match(download.error, /不支持自动下载/);
 });
+test('generic: invalid list mapping reports an error rather than an empty board', async () => {
+ const client = createGenericPlatformClient({baseUrl:'https://p.example.com', fetchImpl: fakeFetch({'/api/challenges': () => ({status:200,json:async()=>({data:{items:[]}})})})});
+ const result = await client.listChallenges();
+ assert.equal(result.ok, false);
+ assert.equal(result.code, 'PLATFORM_LIST_INVALID');
+});
+
+test('generic: custom solved field is honored in the list', async () => {
+ const client = createGenericPlatformClient({baseUrl:'https://p.example.com', profile:{map:{list:{solvedByMe:'progress.solved'}}}, fetchImpl: fakeFetch({'/api/challenges': () => ({status:200,json:async()=>({data:[{id:'a',progress:{solved:true}},{id:'b',progress:{solved:false}}]})})})});
+ assert.deepEqual((await client.listChallenges()).data.map(x=>x.solvedByMe), [true,false]);
+});
+
+test('generic pagination fetches all pages, deduplicates overlaps and preserves query parameters', async () => {
+ const calls=[];
+ const client=createGenericPlatformClient({baseUrl:'https://x',profile:{listPath:'/api/challenges?game=7',pagination:{pageSize:2,maxPages:5}},fetchImpl:async url=>{calls.push(url);const page=Number(new URL(url).searchParams.get('page'));return new Response(JSON.stringify({data:page===1?[{id:'1'},{id:'2'}]:[{id:'2'}]}),{status:200});}});
+ const result=await client.listChallenges();assert.deepEqual(result.data.map(x=>x.id),['1','2']);assert.equal(calls.length,2);assert.ok(calls.every(url=>new URL(url).searchParams.get('game')==='7'));assert.equal(result.possiblyTruncated,false);
+});
+
+test('generic pagination reports repeated pages, partial failure, and malformed continuation', async () => {
+ for(const variant of ['repeated','failure','malformed']) {
+  let count=0;const client=createGenericPlatformClient({baseUrl:'https://x',profile:{pagination:{pageSize:1,hasMorePath:variant==='malformed'?'more':''}},fetchImpl:async()=>{count++;return new Response(JSON.stringify({data:[{id:'1'}],more:'yes'}),{status:variant==='failure'&&count===2?500:200});}});
+  const result=await client.listChallenges();assert.equal(result.ok,false);assert.ok(count<=2);assert.equal(result.data,undefined);
+ }
+});
+
+test('generic pagination signals truncation at a configured maximum', async () => {
+ let count=0;const client=createGenericPlatformClient({baseUrl:'https://x',profile:{pagination:{pageSize:1,maxPages:2}},fetchImpl:async()=>new Response(JSON.stringify({data:[{id:String(++count)}]}),{status:200})});
+ const result=await client.listChallenges();assert.equal(result.possiblyTruncated,true);assert.equal(result.data.length,2);assert.equal(count,2);
+});
+
+test('generic uses custom auth and body templates without interpolating flag content', async () => {
+ let received;
+ const client=createGenericPlatformClient({baseUrl:'https://x',token:'fixture-api-key',profile:{auth:{header:'X-API-Key',prefix:''},submitBody:{challenge:'{id}',answer:{value:'{flag}'},mode:'answer'}},fetchImpl:async(url,init)=>{received=init;return new Response(JSON.stringify({data:{status:'correct'}}),{status:200});}});
+ assert.equal((await client.submit('uuid-7','flag{a"\\b}')).status,'correct');
+ assert.equal(received.headers['X-API-Key'],'fixture-api-key');assert.equal(received.headers.Authorization,undefined);assert.equal(received.redirect,'error');assert.deepEqual(JSON.parse(received.body),{challenge:'uuid-7',answer:{value:'flag{a"\\b}'},mode:'answer'});
+});

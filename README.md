@@ -22,6 +22,7 @@
 - **安全边界**：子代理只能操作自己的题目；全局平台/配置/宿主工具仅主会话可用；工作台拒绝符号链接逃逸。
 - **知识层**：BM25 段落检索、行号与内容摘要引用、重复资料合并；区分原始笔记与可自动参考的资料。见 [记忆与知识库机制](docs/LEARNING.md)。
 - **记忆层**：从可核验实验沉淀步骤和带范围的负结果；来源变化后暂停召回，支持绑定实际尝试与版本的实测反馈，区分召回后解出与资料有用。
+- **会话证据导出**：一键下载当前工作区主会话、解题与蜂群子会话的原始 JSONL 和关联附件；每题独立目录，附会话关联与缺失清单。见 [SESSION-EXPORT.md](docs/SESSION-EXPORT.md)。
 - **复盘交付**：Markdown 报告、单题 Writeup、包含脚本/产物的 tar.gz 打包。
 - **可移植打包**：自带题型卡、角色卡、脚本和测试；外部 `ctf-solver` 技能目录缺失时仍可加载自带题型卡。
 
@@ -260,6 +261,8 @@ ctf_platform_import(ids=["uuid-or-id"], start=true)
 
 ## 平台接入
 
+平台工作流已重构为连接检查、发现选择、准备入队与平台确认。页面按服务器列表快照导入，支持同 ID 不同来源的独立选择。接口、兼容与恢复说明见 [PLATFORM-WORKFLOW.md](docs/PLATFORM-WORKFLOW.md)。
+
 平台核心拆分为连接服务（适配器与客户端生命周期）、操作协调器（资源串行与并发请求合并）和提交服务（验证回显与提交记录），工具和面板共用业务入口。连接配置变更会清理客户端缓存；同一配置复用客户端及 MCP 会话。CTFd 的提交和付费提示解锁不再自动重试；MCP 会话过期时只自动重放明确的只读操作。架构与边界见 [平台核心架构](docs/PLATFORM-ARCHITECTURE.md)。
 
 平台导入按来源平台、赛事/练习场、赛段和题目 ID 去重，各工作区可分别导入；同名题不会被直接跳过。切换平台配置后，旧题的提交、刷新和环境操作要求切回原连接，避免将当前 Token 用于其他平台。当前只保存一套活动平台配置。
@@ -295,14 +298,14 @@ CTFd API Token 只在同源请求中发送；外部 CDN/S3 附件不会携带平
   "submitMethod": "POST",
   "submitBodyField": "flag",
   "map": {
-    "list": { "dataPath": "data", "id": "id", "name": "name", "category": "category", "files": "files" },
+    "list": { "dataPath": "data", "id": "id", "name": "name", "category": "category", "files": "files", "solvedByMe": "solved_by_me" },
     "detail": { "dataPath": "data", "description": "description", "connectionInfo": "connection_info" },
     "submit": { "statusPath": "data.status", "messagePath": "data.message", "okStatuses": ["correct", "accepted"], "alreadyStatuses": ["already_solved"] }
   }
 }
 ```
 
-通用适配器支持字符串 ID、Bearer Token 和自定义 headers；附件自动下载仍只对 CTFd 提供，通用平台请在题面中提供可手动处理的附件地址。
+通用适配器支持字符串 ID、Bearer Token/API Key、自定义鉴权头、嵌套提交体，以及有上限的页码分页；前端提供分页、根数组、API Key 模板。配置示例见 [平台工作流](docs/PLATFORM-WORKFLOW.md)。列表字段映射不是数组时会报错，已解状态可通过 `map.list.solvedByMe` 配置（仅布尔值 `true` 表示已解）。DASCTF 每次请求最多 200 项，达到上限时会提示列表可能不完整；当前接口未提供可用分页时不能保证遍历全部题目。附件自动下载仍只对 CTFd 提供，通用平台请在题面中提供可手动处理的附件地址。
 
 ### DASCTF 开放 API（MCP / REST）
 
