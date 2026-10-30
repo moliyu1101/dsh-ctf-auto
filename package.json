@@ -29,14 +29,19 @@
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "client/",
+    "scripts/build-client.mjs"
   ],
   "license": "MIT",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test/run-tests.mjs"
+    "test": "node test/run-tests.mjs",
+    "build:client": "node scripts/build-client.mjs",
+    "check:client": "node scripts/build-client.mjs --check",
+    "test:ui": "node test/ui/browser-check.mjs"
   },
   "peerDependencies": {
     "@dsh-external/dsh-scanner-tools": "*"

@@ -6,8 +6,14 @@
     - id: dsh-ctf-auto
       name: '@dsh-external/dsh-ctf-auto'
       config:
-        # 同时运行的解题子代理上限
+        # 同时运行的题目上限（每题协调者一个）
         concurrency: 2
+        # 按实验假设派工的蜂群，默认关闭
+        swarmEnabled: false
+        # 全局辅助代理并发上限（每题最多两个；每次尝试最多派四次）
+        swarmConcurrency: 2
+        # 单个辅助代理预算，受本题剩余预算限制
+        swarmWorkerTimeoutMs: 180000
         # 单次尝试超时（毫秒），超时中断并收口为 timeout
         timeoutMs: 1800000
         # 单题最多尝试次数（含首次）

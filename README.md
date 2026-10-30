@@ -13,12 +13,15 @@
 - **Agent 模式**：注册 `ctf-auto`（「CTF 自动解题」）模式，在会话里直接贴题即可派发解题子代理。
 - **多轮编排**：并发队列、单次超时、整题预算、预算结算、自动换角度重试、重启恢复。
 - **独立工作区**：每题一个目录，包含 `statement.md`、`notes.md`、`files/`、`scripts/`、`artifacts/`。
+- **工作区界面**：总览、卡片/列表/看板、九个单题分区、可视化前置实验、快捷查找、深浅主题与容器响应式布局。见 [界面与前端开发](docs/UI-WORKSPACE.md)。
 - **可观测过程**：attempts、facts、events、failedPaths、flag evidence 全部写入状态库并展示在面板。
+- **实验黑板**：持久化假设、测试范围、预期、实测和证据摘要；支持/证伪需证据，重开需新增变量和新证据，重试自动继承。见 [实验黑板与 Muteki 参考设计](docs/EXPERIMENT-BOARD.md)。
+- **按假设派工的蜂群**：默认关闭；协调者从实验黑板派出最多两个辅助代理，离线分析可并行，靶机实验串行，共用本题预算；支持前置依赖、证据就绪后续派和争议独立复验，统一停止和核验。见 [蜂群设计与使用](docs/SWARM.md)。
 - **靶机环境串行**：容器题同一时刻只跑一个，解出/收口后自动销毁环境，配额满时先回收残留再重试。
 - **三平台适配**：CTFd、通用 JSON 与 DASCTF 开放 API（Bearer Token）；支持平台自动探测、按题导入、提示解锁、flag 提交回显。
 - **安全边界**：子代理只能操作自己的题目；全局平台/配置/宿主工具仅主会话可用；工作台拒绝符号链接逃逸。
-- **知识层**：检索导出的 Writeup、题目 notes 和导入资料；跨工作区可用。
-- **记忆层**：解出题后自动沉淀**结构化打法卡**（识别特征 / 前置 / 步骤+命令 / 载荷 / 坑 / 验证 / 置信度 / 复用效果），下次遇到相似题按相似度召回并注入提示词。
+- **知识层**：BM25 段落检索、行号与内容摘要引用、重复资料合并；区分原始笔记与可自动参考的资料。见 [记忆与知识库机制](docs/LEARNING.md)。
+- **记忆层**：从可核验实验沉淀步骤和带范围的负结果；来源变化后暂停召回，支持绑定实际尝试与版本的实测反馈，区分召回后解出与资料有用。
 - **复盘交付**：Markdown 报告、单题 Writeup、包含脚本/产物的 tar.gz 打包。
 - **可移植打包**：自带题型卡、角色卡、脚本和测试；外部 `ctf-solver` 技能目录缺失时仍可加载自带题型卡。
 
@@ -220,6 +223,7 @@ ctf_platform_import(ids=["uuid-or-id"], start=true)
 子代理按 `cwd` 绑定到当前题目，只能使用：
 
 - 自己的工作台：`ctf_workbench_list`、`ctf_workbench_read`、`ctf_workbench_write`
+- 自己的实验黑板：`ctf_experiments`、`ctf_experiment_record`（有证据的假设结论不等于 flag 已验证）
 - 自己的附件分诊和目标探测：`ctf_triage`、`ctf_target_probe`
 - 自己的题板检索：`ctf_search`
 - 自己的 `ctf_flag_record`
@@ -359,8 +363,12 @@ whoami、笔记等）。
 ## 开发与测试
 
 ```bash
+npm run build:client   # 修改 client/ 后生成 DSH 单文件入口
+npm run check:client
 npm test
 ```
+
+浏览器交互验证与截图使用 `npm run test:ui`，独立测试依赖安装方式见 [UI-WORKSPACE.md](docs/UI-WORKSPACE.md)。
 
 当前测试 runner 会递归执行 `test/` 下的全部 `.test.mjs`，覆盖：
 
@@ -395,13 +403,15 @@ lib/
   orchestrator.js   队列、并发、预算、重试和恢复
   store.js          状态库（原子写入、损坏恢复、上限裁剪）
   prompt.js         解题 prompt、flag 提取、结果分类
-  client.js         DSH Web 面板客户端
+  client.js         生成的 DSH Web 面板入口（不要直接编辑）
   ctfd.js           CTFd 客户端
   platform-*.js     通用平台和自动探测
   workbench.js      单题工作区文件操作
   report.js         复盘 Markdown
   writeup.js        Writeup 生成
   kb.js / memory.js 知识层和记忆层
+client/             面板、工作台、组件与样式源码
+scripts/build-client.mjs  无第三方依赖的客户端打包脚本
 assets/
   cards/            自带题型技能卡
   roles/            常驻、solver、recon、reviewer 角色卡
