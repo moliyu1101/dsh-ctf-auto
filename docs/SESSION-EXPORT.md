@@ -8,24 +8,25 @@
 workspace-工作区名-摘要/
   manifest.json
   README.txt
-  _shared/
-    sessions/
-      会话摘要.header.json
-      会话摘要.events.jsonl
-    attachments/
   challenge-第一题-摘要/
     challenge.json
     statement.md
     session-index.json
     sessions/
+      主会话摘要.header.json
+      主会话摘要.events.jsonl
       子代理会话摘要.header.json
       子代理会话摘要.events.jsonl
     attachments/
   challenge-第二题-摘要/
     ...
+  sessions/        # 仅当存在不属于任何题目的工作区级会话
+  attachments/
 ```
 
-会话文件名和题目目录附带稳定摘要，避免同名覆盖与路径穿越。跨题共用的主会话、会话附件只保存一份；各题 `session-index.json` 列出自身子会话和共用主会话的归档路径。图片保留宿主存储的原始编码字节；作为文件附件上传的视频等通过文件流读取，保留字节和文件扩展名。这里不会另行录制屏幕或生成视频。
+每题目录自包含：该题用到的子会话、产生它们的主会话（包括跨题共用的主会话）以及这些会话引用的附件，都复制进自己的目录，**没有 `_shared` 共享目录**。因此共用主会话在多个题目录里各存一份，归档体积随题目数增长（仍受 256MiB 上限约束）。未归属任何题目的工作区级会话放在归档根目录的 `sessions/` 与 `attachments/`。
+
+会话文件名和题目目录附带稳定摘要，避免同名覆盖与路径穿越；各题 `session-index.json` 列出本目录内每个会话的 `header` / `events` 路径与事件数。`manifest.json` 的 `sessions[].copies` 与 `attachments[].copies` 记录每个副本所属的目录，顶层 `header` / `events` / `path` 指向首个副本。图片保留宿主存储的原始编码字节；作为文件附件上传的视频等通过文件流读取，保留字节和文件扩展名。这里不会另行录制屏幕或生成视频。
 
 ## 原始记录与完整性
 

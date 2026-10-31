@@ -52,10 +52,20 @@ test('export refuses a symlink destination and rejects an authorization change b
  assert.ok(!fs.existsSync(f.options.outputDir));
 });
 
-test('archive has one workspace root and separate challenge folders with shared main-session links',async t=>{
+test('each challenge folder is self-contained: main session and attachments are copied per challenge',async t=>{
  const f=fixture(t);f.logs.push({header:{id:'child-two',parentSession:'main',cwd:path.join(f.workspace,'.ctf-auto','two')},events:[{seq:0,type:'message/assistant',content:'第二题推理全文'}]});
+ f.logs[0].events.push({seq:3,type:'message/user',content:[{type:'image',attachment:{attachmentId:'shared-image',bytes:7,mediaType:'image/png'}}]});
  const challenges=[{id:'one',title:'第一题 / cipher',dir:path.join(f.workspace,'.ctf-auto','one'),driverSession:'main',statement:'第一题题面',attempts:[{sessionId:'child'}]},{id:'two',title:'第二题',dir:path.join(f.workspace,'.ctf-auto','two'),driverSession:'main',statement:'第二题题面',attempts:[{sessionId:'child-two'}]}];
- const result=await exportWorkspaceSessions({...f.options,challenges});const m=extract(result,f.root);
- assert.equal(m.complete,true);assert.equal(m.challenges.length,2);assert.ok(m.sessions.find(r=>r.id==='main').events.path.startsWith(m.rootFolder+'/_shared/sessions/'));
- for(const question of m.challenges){assert.ok(fs.statSync(path.join(f.root,question.folder)).isDirectory());const index=JSON.parse(fs.readFileSync(path.join(f.root,question.folder,'session-index.json'),'utf8'));assert.ok(index.sessions.some(r=>r.id==='main'));const child=m.sessions.find(r=>r.id===(question.id==='one'?'child':'child-two'));assert.ok(child.events.path.startsWith(question.folder+'/sessions/'));assert.ok(fs.existsSync(path.join(f.root,question.folder,'statement.md')));}
+ const result=await exportWorkspaceSessions({...f.options,challenges,attachments:{readImage:async()=>({data:Buffer.from('pngdata')})}});const m=extract(result,f.root);
+ assert.equal(m.complete,true);assert.equal(m.challenges.length,2);assert.ok(!JSON.stringify(m).includes('_shared'));
+ for(const question of m.challenges){
+  const dir=path.join(f.root,question.folder);assert.ok(fs.statSync(dir).isDirectory());
+  const index=JSON.parse(fs.readFileSync(path.join(dir,'session-index.json'),'utf8'));const ids=index.sessions.map(s=>s.id);
+  assert.ok(ids.includes('main'),'每题目录都应带主会话');assert.ok(ids.includes(question.id==='one'?'child':'child-two'));
+  for(const session of index.sessions){assert.ok(session.events.path.startsWith(question.folder+'/sessions/'));assert.ok(fs.existsSync(path.join(f.root,session.events.path)));}
+  assert.ok(fs.existsSync(path.join(dir,'statement.md')));
+  assert.ok(fs.readdirSync(path.join(dir,'attachments')).some(name=>name.endsWith('.png')),'主会话引用的图片应复制进题目录');
+ }
+ const mainCopies=m.sessions.find(r=>r.id==='main').copies;assert.equal(mainCopies.length,2);assert.notEqual(mainCopies[0].events.path,mainCopies[1].events.path);
+ assert.equal(m.attachments.find(a=>a.attachmentId==='shared-image').copies.length,2);
 });
