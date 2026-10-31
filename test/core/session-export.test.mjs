@@ -62,6 +62,7 @@ test('each challenge folder is self-contained: main session and attachments are 
   const dir=path.join(f.root,question.folder);assert.ok(fs.statSync(dir).isDirectory());
   const index=JSON.parse(fs.readFileSync(path.join(dir,'session-index.json'),'utf8'));const ids=index.sessions.map(s=>s.id);
   assert.ok(ids.includes('main'),'每题目录都应带主会话');assert.ok(ids.includes(question.id==='one'?'child':'child-two'));
+  assert.ok(!ids.includes(question.id==='one'?'child-two':'child'),'不应把别题的子会话卷进来');
   for(const session of index.sessions){assert.ok(session.events.path.startsWith(question.folder+'/sessions/'));assert.ok(fs.existsSync(path.join(f.root,session.events.path)));}
   assert.ok(fs.existsSync(path.join(dir,'statement.md')));
   assert.ok(fs.readdirSync(path.join(dir,'attachments')).some(name=>name.endsWith('.png')),'主会话引用的图片应复制进题目录');
